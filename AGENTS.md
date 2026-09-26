@@ -27,8 +27,9 @@ This repository is the skill fleet: agent skills that work in any project, plus 
 8. Keep what the installer writes into a project's `AGENTS.md` and `CLAUDE.md` short and generic. It may fill only facts it reads with certainty, such as the repository from the Git remote; everything else stays `TODO` for `setup-project`. It owns only the section between the `skill-fleet:begin` and `skill-fleet:end` markers and never rewrites the rest of either file.
 9. Write code for Node.js 20 or later, using only its standard library. The package has no dependencies, and the scripts copied into projects must run with nothing but Node and the GitHub CLI. Keep paths recorded in the manifest in forward-slash form, so installations match on Windows.
 10. Keep tests out of `skills/`. Everything there is copied into projects, where a project's own test runner would pick them up.
-11. Apply the `technical-writing` and `unslop` skills to every skill, reference, and document you write.
-12. Bump `version` in `package.json` when a change alters shipped files: patch for fixes and wording, minor for new skills, sections, commands, or profile settings, major when an installed project's profile must change.
+11. When a skill takes text from another author, keep that source's licence notice in a `LICENSE` file in the skill's folder, with a line naming the source and pinning its commit, and add the skill to the licence table in `README.md`. Take only text whose licence allows it, such as the MIT License. The fleet itself is under the MIT License in `LICENSE`.
+12. Apply the `technical-writing` and `unslop` skills to every skill, reference, and document you write.
+13. Bump `version` in `package.json` when a change alters shipped files: patch for fixes and wording, minor for new skills, sections, commands, or profile settings, major when an installed project's profile must change.
 
 ## Verification
 

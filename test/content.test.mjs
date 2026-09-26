@@ -87,6 +87,24 @@ describe("content", () => {
     assert.deepEqual([...referenced].filter((name) => !templates.has(name)), []);
   });
 
+  test("the fleet and every borrowed skill carry an MIT licence", () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+    assert.equal(pkg.license, "MIT");
+    assert.ok(pkg.files.includes("LICENSE"));
+    const root = fs.readFileSync(path.join(ROOT, "LICENSE"), "utf8");
+    assert.ok(root.startsWith("MIT License\n\nCopyright (c) "));
+    const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+    const section = readme.slice(readme.indexOf("## License"), readme.indexOf("\n## ", readme.indexOf("## License") + 1));
+    const listed = [...section.matchAll(/^\| `([a-z-]+)` \| /gm)].map(([, name]) => name);
+    const licensed = SKILLS.filter((name) => fs.existsSync(path.join(ROOT, "skills", name, "LICENSE")));
+    assert.deepEqual(listed.sort(), licensed.sort());
+    for (const name of licensed) {
+      const text = fs.readFileSync(path.join(ROOT, "skills", name, "LICENSE"), "utf8");
+      assert.match(text, /^https:\/\/github\.com\/.+\/tree\/[0-9a-f]{40}\//m, `${name} pins its source commit`);
+      assert.ok(text.includes("MIT License") && text.includes("Permission is hereby granted"), name);
+    }
+  });
+
   test("the package ships what the installer reads", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
     for (const entry of ["bin/", "lib/", "skills/", "references/"]) assert.ok(pkg.files.includes(entry), entry);

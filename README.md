@@ -48,6 +48,7 @@ The installer writes:
 - `.claude/skills/`, `.cursor/skills/`, or `.kiro/skills/`: the adapters for the tools you chose;
 - `.agents/references/`: the shared references;
 - `.agents/scripts/check-skills.mjs`: a checker anyone can run with `node .agents/scripts/check-skills.mjs`;
+- `.agents/skill-fleet-LICENSE`: the fleet's licence, which travels with the copies;
 - `.agents/skill-fleet.json`: the version, the choices, and a hash of every file it wrote;
 - `AGENTS.md` and `CLAUDE.md`: the project's instruction files, described below.
 
@@ -156,6 +157,20 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 - The installer and the scripts it copies into projects need Node.js 20 or later and nothing else from npm. The sprint scripts also need the GitHub CLI, authenticated with the `read:project` scope.
 - Adapters are generated for Claude Code, Cursor, and Kiro. Codex and OpenCode read `.agents/skills/` directly.
 - The skills report physical-device, target-hardware, and play-test checks as steps for a person to run. They never claim those checks passed on the strength of a build or an editor run.
+
+## License
+
+The skill fleet is released under the [MIT License](LICENSE). Anyone may use, change, and share it, including in commercial work, as long as the copyright notice stays with the copies.
+
+Three skills contain text by other authors, also under the MIT License. Each carries its original notice in a `LICENSE` file in its folder, which the installer copies with the skill:
+
+| Skill | Source |
+| --- | --- |
+| `unslop` | Copied from the pstack plugin by Lauren Tan |
+| `technical-writing` | Adapted from the pstack plugin by Lauren Tan |
+| `to-spec` | Specification template adapted from Matt Pocock's `to-spec` skill |
+
+`align-issue` credits Matt Pocock's grilling skill for the interview pattern it follows, in its own words.
 
 ## Developing the fleet
 
