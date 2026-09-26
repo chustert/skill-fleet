@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare PR"
+  short_description: "Prepare a reviewable PR behind an approval gate"
+  default_prompt: "Use $prepare-pr to inspect the current branch and draft a PR for my approval."
