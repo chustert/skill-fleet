@@ -60,6 +60,10 @@ describe("install", () => {
     assert.equal(exists(project, ".kiro"), false);
     assert.ok(exists(project, ".agents/references/platforms/game.md"));
     assert.ok(exists(project, ".agents/scripts/check-skills.mjs"));
+    assert.equal(read(project, ".agents/skill-fleet-LICENSE"), fs.readFileSync(path.join(ROOT, "LICENSE"), "utf8"));
+    for (const name of SKILLS.filter((skill) => fs.existsSync(path.join(ROOT, "skills", skill, "LICENSE")))) {
+      assert.ok(exists(project, `.agents/skills/${name}/LICENSE`), name);
+    }
     const manifest = JSON.parse(read(project, checks.MANIFEST));
     assert.deepEqual(manifest.harnesses, ["claude", "cursor"]);
     assert.equal(manifest.instructions, true);
