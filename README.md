@@ -2,8 +2,6 @@
 
 A set of agent skills for building software through one workflow: plan an issue, start it, implement it in reviewable slices, verify it, open a pull request, and review it. The skills work in any project, whether a web app, an iOS or Android app, a game, a back-end service, a library, or a mix of these in one repository or several.
 
-The workflow came from two projects that each carried a hand-adapted copy. This fleet keeps the workflow and moves every project fact out of the skills.
-
 ## How one skill set fits every project
 
 Three layers keep the skills general:
@@ -14,7 +12,7 @@ Three layers keep the skills general:
 | Project profile | a project's `docs/agents/` | Tracker, board, lifecycle statuses, routing, reading order, boundaries, commands, evidence, protected files | The project changes |
 | Shared references | `references/` → a project's `.agents/references/` | The 16 quality characteristics, GitHub link rules, and one guide per platform | The model or a platform's practice changes |
 
-A skill never says "run `npm run build`" or "move the issue on the Sprints board". It says "run the final verification in `docs/agents/verification.md`" and "move the issue to the started status on the board in `docs/agents/issue-tracker.md`". The [project profile reference](references/project-profile.md) defines the three profile files and how skills treat a missing, `TODO`, or `None` value.
+A skill never says "run `npm run build`" or "move the issue on the Roadmap board". It says "run the final verification in `docs/agents/verification.md`" and "move the issue to the started status on the board in `docs/agents/issue-tracker.md`". The [project profile reference](references/project-profile.md) defines the three profile files and how skills treat a missing, `TODO`, or `None` value.
 
 Platform differences live in the [platform guides](references/platforms/README.md): `web`, `mobile`, `desktop`, `game`, `service`, and `library-cli`. Each gives the default test seams, runtime evidence, bug feedback loops, compatibility risks, and visible-first build order for that kind of software. The profile names each component's platform, so `verify-work` knows that a web change needs a browser pass, an iOS change needs simulator and device evidence kept apart, and a game change needs a play-test and a profiler capture on target hardware.
 
@@ -134,27 +132,6 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 ### Used by other skills
 
 `align-issue`, `cross-boundary-contract`, `tdd`, `diagnosing-bugs`, `technical-writing`, and `unslop` run from inside the workflows above. You can also invoke them directly, for example `/diagnosing-bugs` for a defect or `/teach` to be walked through code.
-
-## What changed from the project copies
-
-- `cross-boundary-contract` replaces `cross-repository-contract` and `cross-component-contract`. It covers independent repositories and separately deployed components, and adds installed apps, save files, multiplayer protocols, library APIs, and CLI output formats.
-- `setup-project` is new. It replaces the hand-adaptation each project needed.
-- Routing, board, lifecycle statuses, issue types, base branch, and time zone come from `docs/agents/issue-tracker.md`. Issue types are used only when the owner is an organization that has them.
-- `create-issue` and `prepare-pr` use the repository's own issue forms and pull-request template when it has them.
-- `verify-work` gathers evidence per platform through the platform guides, instead of fixed web and iOS sections, and keeps device, hardware, play-test, and paid-service limits apart.
-- `tdd` has a documented fallback for components without a test runner.
-- `teach` works visible-first rather than front-end-first: the screen, the playable greybox, the command line, or the usage example, depending on the platform.
-- The sprint scripts take the owner, board, fields, and status names as flags, detect organization or user owners, and work on boards without iterations or without a board. `sprint-recap` also accepts `--since` and `--until`.
-
-## Moving an existing project onto the fleet
-
-The installer will not overwrite skills it did not write, so a project that already carries adapted copies keeps them until you move it deliberately:
-
-1. Run `setup-project`'s inspection by hand, or copy the existing tracker, routing, reading-order, contract, command, and secret-file facts into the three profile files from the templates.
-2. Delete the project's own copies of the skills and adapters that the fleet replaces, including the renamed contract skill.
-3. Run `python3 scripts/fleet.py install <project>`, then `python3 .agents/scripts/check_skills.py` in the project.
-4. The installer adds its section to the project's existing `AGENTS.md` and leaves the rest alone. Remove the project's own text that the section now covers, and point references to the project's copy of the quality characteristics at `.agents/references/software-quality-characteristics.md`.
-5. Run a smoke test in each coding agent: ask for the tracker, board, protected files, and one component's verification commands, then list the skills.
 
 ## Limits
 
