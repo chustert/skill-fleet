@@ -1,0 +1,167 @@
+import assert from "node:assert/strict";
+import { afterEach, describe, test } from "node:test";
+import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
+import * as recap from "../skills/sprint-recap/scripts/sprint-recap.mjs";
+
+const saved = { ...recap.deps };
+afterEach(() => Object.assign(recap.deps, saved));
+
+describe("windows and time zones", () => {
+  test("a sprint crossing a daylight-saving change", () => {
+    const [start, end] = recap.window({ start: "2026-09-21", end: "2026-10-04" }, "Pacific/Auckland",
+      new Date("2026-10-10T00:00:00Z"));
+    assert.equal(recap.iso(start), "2026-09-20T12:00:00Z");
+    assert.equal(recap.iso(end), "2026-10-04T11:00:00Z");
+    assert.ok(recap.within(recap.iso(start), start, end));
+    assert.ok(!recap.within(recap.iso(end), start, end));
+  });
+
+  test("zones west of UTC and UTC itself", () => {
+    assert.equal(recap.iso(recap.zoneMidnight("2026-03-08", "America/Los_Angeles")), "2026-03-08T08:00:00Z");
+    assert.equal(recap.iso(recap.zoneMidnight("2026-03-09", "America/Los_Angeles")), "2026-03-09T07:00:00Z");
+    assert.equal(recap.iso(recap.zoneMidnight("2026-01-01", "UTC")), "2026-01-01T00:00:00Z");
+  });
+
+  test("the current sprint stops at collection time", () => {
+    const now = new Date("2026-09-22T23:00:00Z");
+    const [, end] = recap.window({ start: "2026-09-21", end: "2026-10-04" }, "Europe/Berlin", now);
+    assert.equal(end.getTime(), now.getTime());
+  });
+
+  test("today follows the time zone, not the machine", () => {
+    const now = new Date("2026-09-26T20:00:00Z");
+    assert.equal(recap.zoneToday(now, "Pacific/Auckland"), "2026-09-27");
+    assert.equal(recap.zoneToday(now, "America/New_York"), "2026-09-26");
+  });
+});
+
+describe("search", () => {
+  test("paginates past one hundred results", () => {
+    recap.deps.api = (_endpoint, params) => {
+      const begin = (params.page - 1) * 100;
+      const items = [];
+      for (let i = begin; i < Math.min(begin + 100, 101); i += 1) items.push({ html_url: `https://example.test/${i}` });
+      return { total_count: 101, incomplete_results: false, items };
+    };
+    assert.equal(recap.search("query").length, 101);
+  });
+
+  test("a partial search is never reported as complete", () => {
+    for (const result of [{ total_count: 1001, items: [] }, { total_count: 0, incomplete_results: true, items: [] }]) {
+      recap.deps.api = () => result;
+      assert.throws(() => recap.search("query"));
+    }
+  });
+});
+
+describe("attribution", () => {
+  test("reviews count by actor and submission time", () => {
+    const pr = { url: "https://example.test/pr", repo: "org/repo", number: 1, title: "PR" };
+    const start = new Date("2026-09-21T00:00:00Z");
+    const end = new Date("2026-10-05T00:00:00Z");
+    const reviews = [
+      [1, "me", "APPROVED", "2026-09-20T23:59:59Z"],
+      [2, "ME", "DISMISSED", "2026-09-21T00:00:00Z"],
+      [3, "me", "COMMENTED", "2026-10-05T00:00:00Z"],
+      [4, "other", "APPROVED", "2026-09-22T00:00:00Z"],
+      [5, "me", "PENDING", null],
+      [6, "me", "COMMENTED", "2026-09-23T00:00:00Z"],
+    ].map(([id, login, state, submitted]) => ({
+      id, html_url: `https://example.test/review/${id}`, user: { login }, state, submitted_at: submitted,
+    }));
+    assert.deepEqual(recap.reviewRows(pr, reviews, "me", start, end).map((r) => r.id), [2, 6]);
+  });
+
+  test("opening, merging, and merge actions stay separate", () => {
+    const row = (repo, number, author, created) => ({
+      repository_url: `https://api.github.com/repos/${repo}`, html_url: `https://github.com/${repo}/pull/${number}`,
+      number, title: "PR", user: { login: author }, created_at: created, state: "closed",
+    });
+    const carryover = row("org/a", 1, "me", "2026-09-01T00:00:00Z");
+    const other = row("org/b", 1, "other", "2026-09-22T00:00:00Z");
+    const opened = row("org/a", 2, "me", "2026-09-22T00:00:00Z");
+    const results = [[], [opened], [carryover, other, opened], []];
+    recap.deps.search = () => results.shift();
+    recap.deps.api = (endpoint) => ({
+      merged_at: "2026-09-23T00:00:00Z", draft: false, state: "closed", closed_at: "2026-09-23T00:00:00Z",
+      merged_by: { login: endpoint.includes("/b/") ? "me" : "other" },
+    });
+    const [activity] = recap.collect("me", new Date("2026-09-21T00:00:00Z"), new Date("2026-10-05T00:00:00Z"),
+      "org:org");
+    const totals = recap.metrics(activity);
+    assert.equal(totals.PRsOpened, 1);
+    assert.equal(totals.authoredPRsMerged, 2);
+    assert.equal(totals.mergeActions, 1);
+    assert.equal(totals.medianHoursOpenToMerge, (22 * 24 + 24) / 2);
+    assert.equal(activity.mergeActions[0].repo, "org/b");
+  });
+
+  test("zero merges is unavailable and distinct reviews use URLs", () => {
+    const result = recap.metrics({ authoredPRsMerged: [], reviewsSubmitted: [
+      { prUrl: "https://example.test/a/1" }, { prUrl: "https://example.test/a/1" },
+      { prUrl: "https://example.test/b/1" }] });
+    assert.equal(result.medianHoursOpenToMerge, null);
+    assert.equal(result.distinctPRsReviewed, 2);
+  });
+});
+
+describe("scope", () => {
+  test("listed repositories narrow every query", () => {
+    const scope = recap.scopeQualifier("acme", "organization", ["acme/web", "acme/app"]);
+    assert.equal(scope, "repo:acme/web repo:acme/app");
+    const queries = [];
+    recap.deps.search = (query) => {
+      queries.push(query);
+      return [];
+    };
+    recap.collect("me", new Date("2026-09-21T00:00:00Z"), new Date("2026-10-05T00:00:00Z"), scope);
+    assert.equal(queries.length, 4);
+    for (const query of queries) assert.ok(query.startsWith("repo:acme/web repo:acme/app "));
+  });
+
+  test("the owner type selects the org or user qualifier", () => {
+    assert.equal(recap.scopeQualifier("acme", "organization", []), "org:acme");
+    assert.equal(recap.scopeQualifier("someone", "user", []), "user:someone");
+  });
+});
+
+describe("periods", () => {
+  const NOW = new Date("2026-09-26T10:00:00Z");
+
+  test("an explicit window needs no board", () => {
+    const args = recap.parseArgs(["--owner", "acme", "--since", "2026-09-01", "--until", "2026-09-07"]);
+    const [board, period, start, end] = recap.selectPeriod(args, NOW);
+    assert.equal(board, null);
+    assert.equal(period.title, "Custom window");
+    assert.equal(recap.iso(start), "2026-09-01T00:00:00Z");
+    assert.equal(recap.iso(end), "2026-09-08T00:00:00Z");
+  });
+
+  test("a sprint or a window is required, not both", () => {
+    assert.throws(() => recap.parseArgs(["--owner", "acme"]), sd.UsageError);
+    assert.throws(() => recap.parseArgs(["--owner", "acme", "--project", "B", "--since", "2026-09-01",
+      "--date", "2026-09-02"]), sd.UsageError);
+    assert.throws(() => recap.parseArgs(["--owner", "acme", "--until", "2026-09-02"]), sd.UsageError);
+    assert.throws(() => recap.parseArgs(["--owner", "acme", "--since", "2026-09-01", "--timezone", "Mars/Base"]),
+      sd.UsageError);
+  });
+
+  test("a window without --until ends today in the time zone", () => {
+    const args = recap.parseArgs(["--owner", "acme", "--since", "2026-09-10", "--timezone", "Europe/Berlin"]);
+    const [, period, start] = recap.selectPeriod(args, NOW);
+    assert.equal(period.end, "2026-09-26");
+    assert.equal(recap.iso(start), "2026-09-09T22:00:00Z");
+  });
+
+  test("a board without iterations asks for a window", () => {
+    recap.deps.resolveIterations = () => [{ title: "Board", url: "u" }, null, null, []];
+    assert.throws(() => recap.selectPeriod(recap.parseArgs(["--owner", "acme", "--project", "Board"]), NOW),
+      /no iteration field/);
+  });
+
+  test("no sprint on the chosen date is an error", () => {
+    recap.deps.resolveIterations = () => [{ title: "Board", url: "u" }, "Sprint", null, []];
+    assert.throws(() => recap.selectPeriod(recap.parseArgs(["--owner", "acme", "--project", "Board",
+      "--date", "2026-01-01"]), NOW), /No sprint contains 2026-01-01/);
+  });
+});

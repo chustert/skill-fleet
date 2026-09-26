@@ -235,7 +235,7 @@ project intent, and anything marked proposed. Apply the corrections.
 
 ## 10. Check the installation
 
-Run `python3 .agents/scripts/check_skills.py` from the project root when it
+Run `node .agents/scripts/check-skills.mjs` from the project root when it
 exists, and report the result. Recommend a smoke test in each coding agent the
 team uses: ask it to name the product, the tracker, the board, the protected
 files, and the verification commands for one component, then to list the
