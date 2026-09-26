@@ -13,7 +13,7 @@ This repository is the skill fleet: agent skills that work in any project, plus 
 - `lib/prompts.mjs`: the terminal checkbox and yes-or-no questions.
 - `test/`: tests for the package, the skills' content, and the sprint scripts. They are not published and never reach a project.
 - `package.json`: the package name, the version recorded in each project's manifest, and what npm publishes.
-- `.github/workflows/`: `test.yml` runs the tests on Linux, macOS, and Windows; `publish.yml` publishes a tagged version to npm.
+- `.github/workflows/`: `test.yml` runs the tests on Linux, macOS, and Windows; `publish.yml` stages a tagged version on npm for the maintainer to approve.
 
 ## Rules for changing skills
 
@@ -50,7 +50,8 @@ The sprint scripts call GitHub; test them against a real board only with read-on
 ## Releasing
 
 1. Bump `version` in `package.json` and merge the change to `main`.
-2. Tag the merge commit as `v<version>`, such as `v1.2.0`, and push the tag. `publish.yml` tests the package, checks that the tag matches the version, publishes to npm through trusted publishing, and creates the GitHub release.
+2. Tag the merge commit as `v<version>`, such as `v1.2.0`, and push the tag. `publish.yml` tests the package, checks that the tag matches the version, stages the version on npm through trusted publishing, and creates the GitHub release.
+3. The maintainer approves the staged version with two-factor authentication, in the package's **Staged Packages** tab on npmjs.com or with `npm stage approve <stage-id>`. Only then does it go live. Never approve a staged version on the maintainer's behalf.
 
 ## Working rules
 
