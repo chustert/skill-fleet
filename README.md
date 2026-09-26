@@ -18,21 +18,37 @@ Platform differences live in the [platform guides](references/platforms/README.m
 
 ## Install into a project
 
-The installer copies the fleet into the project, so the project stays self-contained for collaborators who do not have this repository.
+Run the installer from the project's root folder with any package manager. It needs Node.js 20 or later:
 
 ```sh
-git clone https://github.com/chustert/skill-fleet.git
-cd skill-fleet
-python3 scripts/fleet.py install ~/path/to/project
+npx skill-fleet@latest        # npm
+pnpm dlx skill-fleet@latest   # pnpm
+yarn dlx skill-fleet@latest   # Yarn 2 or later; with Yarn 1, use npx
+bunx skill-fleet@latest       # Bun
 ```
 
-It writes:
+It asks three questions, then copies the fleet into the project so the project stays self-contained for collaborators who never run the installer:
 
-- `.agents/skills/`: the canonical skills, which Codex and OpenCode read directly;
-- `.claude/skills/` and `.cursor/skills/`: thin adapters that point at the canonical skills. Add `--harness kiro` for `.kiro/skills/`;
+1. **Which coding tools should get skill adapters?** Claude Code, Cursor, and Kiro each read skills from their own folder, so each gets a thin adapter that points at the canonical skill. Codex and OpenCode read `.agents/skills/` directly and need none.
+2. **Create or update `AGENTS.md` and `CLAUDE.md`?** Described below.
+3. **Overwrite the conflicting files?** Asked only when a file the fleet would write already exists and the fleet did not write it, or you changed it since. The answer defaults to no.
+
+Outside a Git repository it also asks whether you meant to install there. `--yes` skips every question and keeps the choices recorded by the last installation, or uses Claude Code, Cursor, and the instruction files the first time. Without a terminal, such as in CI, it asks nothing and behaves as with `--yes`. Flags answer a single question instead:
+
+| Flag | Effect |
+| --- | --- |
+| `--claude`, `--cursor`, `--kiro`, or `--tools claude,cursor` | Choose the tools; `--tools none` writes no adapters |
+| `--instructions`, `--no-instructions` | Create and update `AGENTS.md` and `CLAUDE.md`, or leave both alone |
+| `--force` | Overwrite conflicting files without asking |
+| `--dry-run` | Show what would change and write nothing |
+
+The installer writes:
+
+- `.agents/skills/`: the canonical skills;
+- `.claude/skills/`, `.cursor/skills/`, or `.kiro/skills/`: the adapters for the tools you chose;
 - `.agents/references/`: the shared references;
-- `.agents/scripts/check_skills.py`: a checker collaborators can run without this repository;
-- `.agents/skill-fleet.json`: the version, tools, and a hash of every file it wrote;
+- `.agents/scripts/check-skills.mjs`: a checker anyone can run with `node .agents/scripts/check-skills.mjs`;
+- `.agents/skill-fleet.json`: the version, the choices, and a hash of every file it wrote;
 - `AGENTS.md` and `CLAUDE.md`: the project's instruction files, described below.
 
 It never writes anything in `docs/`. The profile there belongs to the project.
@@ -45,21 +61,22 @@ Every coding agent reads `AGENTS.md` first, and Claude Code reads `CLAUDE.md`. T
 - A project without `CLAUDE.md` gets one that imports `AGENTS.md`, when Claude Code is one of the chosen tools. An existing `CLAUDE.md` that lacks the import gets it added at the top.
 - Both files carry a section between `<!-- skill-fleet:begin -->` and `<!-- skill-fleet:end -->` markers. In `AGENTS.md` it explains the workflow, where the profile lives, and which files not to edit by hand. The installer rewrites only that section on every update, and adds it to an `AGENTS.md` you wrote yourself without touching the rest.
 
-If you edit the section by hand, the next install stops with a conflict rather than overwrite your change. If you delete it, the installer leaves it out from then on, unless you pass `--force`.
+If you edit the section by hand, the next install reports a conflict rather than overwrite your change. If you delete it, the installer leaves it out from then on, unless you pass `--force`.
 
-### Workspaces and updates
+### Updates, checks, and workspaces
+
+```sh
+npx skill-fleet@latest update            # update an existing installation
+npx skill-fleet@latest update --dry-run  # preview the update
+npx skill-fleet@latest check             # verify adapters, hashes, and links
+npx skill-fleet@latest list              # list the skills
+```
+
+Each command takes the project folder as an optional argument, such as `npx skill-fleet@latest update ../my-app`, and defaults to the current folder. `update` asks the same questions with your previous answers selected. It updates changed files, removes files the fleet no longer ships, and leaves unchanged files alone. It never overwrites a file it did not write without asking, so a project that already has its own skills with the same names is safe.
 
 In a workspace that holds several independent repositories, install at the workspace root, where cross-repository work starts. Install into a child repository as well only if people also open it on its own. Each installation then needs its own profile.
 
-It refuses to overwrite a file it did not write, or one edited since it wrote it, and writes nothing at all when any such conflict exists. A project that already has its own skills with the same names is therefore safe. `--dry-run` shows the plan, and `--force` overwrites conflicts after you have decided to.
-
-To update a project after changing the fleet, run the same command again. It updates changed files, removes files the fleet no longer ships, and leaves unchanged files alone. It remembers the tools you chose.
-
-```sh
-python3 scripts/fleet.py install ~/path/to/project --dry-run   # preview
-python3 scripts/fleet.py check ~/path/to/project               # verify adapters, hashes, and links
-python3 scripts/fleet.py list                                  # list the skills
-```
+To try an unreleased version, run the installer straight from GitHub with `npx github:chustert/skill-fleet`, or from a clone with `node bin/skill-fleet.mjs install <project>`.
 
 ## Adapt it to the project
 
@@ -136,16 +153,16 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 ## Limits
 
 - The tracker is GitHub: Issues, sub-issues, and optionally a Projects board. Another tracker needs its own versions of the tracker steps and sprint scripts.
-- The sprint scripts need the GitHub CLI, authenticated with the `read:project` scope, and Python 3.9 or later. They use only the standard library.
+- The installer and the scripts it copies into projects need Node.js 20 or later and nothing else from npm. The sprint scripts also need the GitHub CLI, authenticated with the `read:project` scope.
 - Adapters are generated for Claude Code, Cursor, and Kiro. Codex and OpenCode read `.agents/skills/` directly.
 - The skills report physical-device, target-hardware, and play-test checks as steps for a person to run. They never claim those checks passed on the strength of a build or an editor run.
 
 ## Developing the fleet
 
-[AGENTS.md](AGENTS.md) holds the rules for changing the fleet. Run every test with:
+[AGENTS.md](AGENTS.md) holds the rules for changing the fleet and the release steps. Run the tests with:
 
 ```sh
-python3 -m unittest discover -s tests
-python3 -m unittest discover -s skills/sprint-status/scripts
-python3 -m unittest discover -s skills/sprint-recap/scripts
+npm test
 ```
+
+A GitHub Action runs them on Linux, macOS, and Windows with Node.js 20, 22, and 24. Pushing a version tag, such as `v1.2.0`, publishes that version to npm.

@@ -1,0 +1,45 @@
+{
+  "name": "skill-fleet",
+  "version": "1.1.0",
+  "description": "Workflow skills for coding agents that work in any project: plan, start, implement, verify, and review GitHub issues.",
+  "type": "module",
+  "bin": {
+    "skill-fleet": "bin/skill-fleet.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "skills/",
+    "references/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chustert/skill-fleet.git"
+  },
+  "homepage": "https://github.com/chustert/skill-fleet#readme",
+  "bugs": {
+    "url": "https://github.com/chustert/skill-fleet/issues"
+  },
+  "keywords": [
+    "agent-skills",
+    "ai-coding",
+    "claude-code",
+    "codex",
+    "cursor",
+    "kiro",
+    "opencode",
+    "skills",
+    "workflow",
+    "github"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

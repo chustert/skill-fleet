@@ -28,9 +28,10 @@ flags. If a value the command needs is still `TODO`, say so and recommend
 Run the script that ships with this skill, from the project root:
 
 ```bash
-python3 .agents/skills/sprint-status/scripts/sprint_data.py --owner <owner> --project "<board title>" [--repo <owner/repo> ...]
+node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" [--repo <owner/repo> ...]
 ```
 
+The script needs Node.js 20 or later and the GitHub CLI, and nothing else.
 Tool adapters in `.claude/skills/`, `.cursor/skills/`, and `.kiro/skills/` do
 not carry a copy of the script. Always run the canonical path above, and do not
 reimplement the queries inline.

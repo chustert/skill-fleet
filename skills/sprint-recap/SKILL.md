@@ -23,10 +23,11 @@ still `TODO`, say so and recommend `setup-project` rather than guessing.
 Run from the project root:
 
 ```bash
-python3 .agents/skills/sprint-recap/scripts/sprint_recap.py --owner <owner> --project "<board title>" --timezone <IANA zone> [--repo <owner/repo> ...]
+node .agents/skills/sprint-recap/scripts/sprint-recap.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> [--repo <owner/repo> ...]
 ```
 
-The collector reuses the sibling `sprint-status/scripts/sprint_data.py` for the
+The collector needs Node.js 20 or later and the GitHub CLI. It reuses the sibling
+`sprint-status/scripts/sprint-data.mjs` for the
 owner, board, and iteration definition. Keep both canonical skill directories together.
 Run the canonical script when invoked through a tool adapter. Do not copy the collector into adapters.
 
