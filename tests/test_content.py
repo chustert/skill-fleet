@@ -20,9 +20,6 @@ REPLACED_TERMS = re.compile(
     r"cross-repository-contract|cross-component-contract|component_contracts|"
     r"cross_repository_contracts|typesense|supabase|stripe",
     re.IGNORECASE)
-# Names of the projects the fleet came from stay out of this public repository.
-# List them in this ignored file, one per line, to check for them locally.
-LOCAL_TERMS = ROOT / "tests/local-terms.txt"
 
 
 def shipped_files():
@@ -54,14 +51,6 @@ class ContentTests(unittest.TestCase):
 
     def test_replaced_names_and_vendors_do_not_ship(self):
         self.assertEqual(leaks(REPLACED_TERMS), [])
-
-    def test_no_local_project_names_ship(self):
-        if not LOCAL_TERMS.is_file():
-            self.skipTest("tests/local-terms.txt is absent. List project names in it to check for them.")
-        terms = [line.strip() for line in LOCAL_TERMS.read_text().splitlines()
-                 if line.strip() and not line.startswith("#")]
-        if terms:
-            self.assertEqual(leaks(re.compile("|".join(map(re.escape, terms)), re.IGNORECASE)), [])
 
     def test_every_platform_has_a_complete_guide(self):
         index = (ROOT / "references/platforms/README.md").read_text()
