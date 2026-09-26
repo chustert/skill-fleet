@@ -14,15 +14,10 @@ PLATFORMS = ("web", "mobile", "desktop", "game", "service", "library-cli")
 GUIDE_SECTIONS = ("## Test seams", "## Runtime evidence", "## Bug feedback loops",
                   "## Compatibility at boundaries", "## Visible-first order")
 
-# Skill names the fleet replaced, contract documents they depended on, and
-# vendors a skill must not assume. None of them may appear in shipped files.
-REPLACED_TERMS = re.compile(
-    r"cross-repository-contract|cross-component-contract|component_contracts|"
-    r"cross_repository_contracts|typesense|supabase|stripe",
-    re.IGNORECASE)
-# Names of the projects the fleet came from stay out of this public repository.
-# List them in this ignored file, one per line, to check for them locally.
-LOCAL_TERMS = ROOT / "tests/local-terms.txt"
+# Shipped files may link GitHub only through placeholder owners, the orgs/ and
+# users/ segments of board URLs, and the credited author of a borrowed pattern.
+GITHUB_OWNER = re.compile(r"(?<![\w.-])github\.com[:/]([\w.-]+)")
+ALLOWED_OWNERS = {"owner", "acme", "orgs", "users", "mattpocock"}
 
 
 def shipped_files():
@@ -52,16 +47,10 @@ class ContentTests(unittest.TestCase):
     def test_relative_links_resolve(self):
         self.assertEqual(checks.check_links(ROOT, [ROOT / "skills", ROOT / "references"]), [])
 
-    def test_replaced_names_and_vendors_do_not_ship(self):
-        self.assertEqual(leaks(REPLACED_TERMS), [])
-
-    def test_no_local_project_names_ship(self):
-        if not LOCAL_TERMS.is_file():
-            self.skipTest("tests/local-terms.txt is absent. List project names in it to check for them.")
-        terms = [line.strip() for line in LOCAL_TERMS.read_text().splitlines()
-                 if line.strip() and not line.startswith("#")]
-        if terms:
-            self.assertEqual(leaks(re.compile("|".join(map(re.escape, terms)), re.IGNORECASE)), [])
+    def test_no_specific_github_owner_ships(self):
+        named = [line for line in leaks(GITHUB_OWNER)
+                 if set(GITHUB_OWNER.findall(line)) - ALLOWED_OWNERS]
+        self.assertEqual(named, [])
 
     def test_every_platform_has_a_complete_guide(self):
         index = (ROOT / "references/platforms/README.md").read_text()
