@@ -12,6 +12,15 @@ finding through the shared software-quality characteristics.
 Do not edit source, tests, configuration, documentation, or project state. Do not
 silently switch from reviewer to implementer, even when a fix looks obvious.
 
+An independent review needs a context that did not build the code. If this
+conversation planned, wrote, or debugged the code under review, run the review
+in a subagent, following the [subagent rules](../../references/subagents.md).
+The brief gives the scope and the requirement sources, but not the reasons the
+code was written as it was. For a pull request, the subagent returns the
+report and you post it as `Publish the GitHub PR report` describes. When the
+host cannot start a subagent, review inline and state in the report that the
+review was not independent.
+
 For a GitHub pull request, reading its metadata and patch and posting one final
 report comment are part of the requested review workflow. Do not approve, request
 changes, merge, label, close, or otherwise modify the pull request.
@@ -292,6 +301,55 @@ A passing command supports only the paths and assertions it exercises. It does
 not prove every characteristic. Connect missing or weak tests to a meaningful
 regression risk before reporting them as findings.
 
+## Split a large diff across subagents
+
+One reader loses track of a large diff. When the reviewable diff, after the
+exclusions named in the scope, changes more than about 1,000 lines or touches
+more than one component, split the engineering-standards pass across read-only
+subagents, following the [subagent rules](../../references/subagents.md).
+Review a smaller diff in one pass.
+
+1. Do the shared work yourself first: resolve the scope, prepare the review
+   worktree, and run the PR test plan and the verification checks. These start
+   processes and write build output, so they run once.
+2. Divide the changed files into areas. Each area holds one component, or one
+   coherent part of a large component, such as a module with its tests. Keep a
+   file and its tests in the same area, and aim for a few hundred changed lines
+   per area.
+3. Start one subagent per area. They may run side by side, because none of them
+   writes anything. Brief each with:
+   - this skill's file, and the instruction to apply only its engineering
+     standards pass;
+   - the worktree path, the base and head commits, the area's paths, and the
+     full list of changed files, so that it can follow a contract into another
+     area;
+   - the requirement sources, the project's `Quality weighting`, and the
+     verification evidence;
+   - the limits: change nothing, post nothing, and run no test, build, or other
+     command that starts a process or writes a file, but name any check it
+     needs so you can run it; and
+   - the report to return: findings in the format under `Findings` with
+     provisional IDs, a status for each of the 16 characteristics within the
+     area, and the contracts the area shares with other areas.
+4. Keep the specification-satisfaction pass yourself, over the whole diff.
+   Whether a requirement is missing can only be judged across every area.
+5. Review what crosses areas yourself: the shared contracts the subagents
+   listed, and callers in one area of code that changed in another.
+6. Run the checks the subagents asked for, then merge their reports as the
+   subagent rules describe. Number the findings again from `R-01` in severity
+   order.
+
+Combine the coverage statuses for each characteristic in this order:
+
+1. `Concern` when any area found one.
+2. Otherwise `Not verified` when any area could not verify it.
+3. Otherwise `Not assessed` when any area did not assess it.
+4. Otherwise `Not applicable` when every area marked it so, and
+   `No concern found` in every other case.
+
+When the host cannot start subagents, review the areas one at a time yourself.
+Finish the notes for each area before reading the next.
+
 ## Quality model
 
 Use the 16 characteristics defined in the
@@ -358,7 +416,8 @@ Lead with findings rather than a long summary. Produce:
 
 1. **Verdict and scope** - separate readiness judgments for Specification
    satisfaction and Engineering standards, plus the baseline, included paths,
-   and important exclusions. For a PR, include its number, URL, base SHA, head
+   and important exclusions. Say whether the review ran independently, and
+   which areas subagents reviewed. For a PR, include its number, URL, base SHA, head
    SHA, and state that findings are limited to the PR diff. Link the PR, its
    issues, and any commit or comparison you cite, per the
    [GitHub reference rules](../../references/github-references.md). The report

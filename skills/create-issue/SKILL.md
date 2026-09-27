@@ -65,6 +65,29 @@ Before including a factual claim that the user did not supply:
 5. If the claim cannot be verified, remove it or state exactly what remains
    unknown. Do not fill the gap with general industry or domain reasoning.
 
+Check the claims in a subagent when that takes more than a few lookups, such as
+several claims, a component you have not read yet, or a component in another
+repository. Follow the [subagent rules](../../references/subagents.md). A
+subagent that has not seen the draft checks each claim without leaning toward
+it. Brief it with:
+
+- each claim as a statement to confirm or refute;
+- the component and repository that own each claim, and the reading order in
+  `docs/agents/domain.md`;
+- the limits: change nothing, create or edit no issue, and contact no service
+  beyond reading GitHub issues and pull requests; and
+- the report to return: for each claim, `Supported`, `Contradicted`, or
+  `Not found`, with every source it inspected, such as a file and line, a
+  migration, an issue link, or a log.
+
+Leave out the rest of the draft and the answer you expect. Claims owned by
+different repositories may go to separate subagents that run side by side.
+When only one or two claims need checking, in a file you have already read,
+check them inline.
+
+Before a claim enters the draft, open the source the subagent cites. Treat a
+`Contradicted` claim as step 4 says and a `Not found` claim as step 5 says.
+
 Keep a lightweight evidence map while drafting. It may remain internal, but
 each added factual claim must trace to the user's evidence or a source the agent
 actually inspected. Include a file, symbol, migration, issue, log, or stable
