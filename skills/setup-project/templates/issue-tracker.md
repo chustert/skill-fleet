@@ -2,7 +2,9 @@
 
 GitHub is the source of truth for this project's work items. The workflow skills in `.agents/skills/` read this file for tracker settings instead of hard-coding them. Resolve project, field, item, and option identifiers from GitHub every time; never record them here.
 
-`TODO` marks a value nobody has confirmed. `None` means the project deliberately does without it.
+The skill-fleet installer creates this file and fills every tracker setting it can read from GitHub, including the project board it creates or links. The board is required, because the workflow moves every issue across it. When the board changes, run `npx skill-fleet@latest update`.
+
+`TODO` marks a value nobody has confirmed. `None` means the project deliberately does without it, which the board rows never allow.
 
 ## Tracker settings
 
@@ -12,10 +14,10 @@ GitHub is the source of truth for this project's work items. The workflow skills
 | Owner type | TODO: `Organization` or `User`. GitHub issue types exist only for organizations. |
 | Issue types | TODO: `Resolve from GitHub` when the organization uses them, otherwise `None`. |
 | Fallback repository | TODO: where a new issue goes when its owning component is unclear. |
-| Project board | TODO: the board's exact title and owner, such as `Sprints` owned by `acme`, or `None`. |
-| Status field | TODO: the single-select field that holds the lifecycle status, usually `Status`, or `None`. |
+| Project board | TODO: the board's exact title, its owner, and its URL. |
+| Status field | TODO: the single-select field that holds the lifecycle status, usually `Status`. |
 | Lifecycle statuses | TODO: new → `Todo`; started → `In progress`; in review → `In review`; done → `Done`. |
-| Iteration field | TODO: the iteration field's name, such as `Sprint`, or `None`. |
+| Iteration field | TODO: the iteration field's name, usually `Sprint`. |
 | Sprint time zone | TODO: an IANA time zone, such as `Europe/Berlin`. |
 | Default base branch | TODO: `main`. |
 | Branch format | `<category>/<issue-number>-<slug>`, such as `feature/12-export-button`. |

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { describe, test } from "node:test";
-import { checkbox, checkboxReducer, CancelledError, confirm } from "../lib/prompts.mjs";
+import { checkbox, checkboxReducer, CancelledError, confirm, select } from "../lib/prompts.mjs";
 
 const start = { cursor: 0, checked: [true, false, false], done: false, cancelled: false };
 
@@ -44,6 +44,15 @@ describe("prompts over a stream", () => {
     input.emit("keypress", " ", { name: "space" });
     input.emit("keypress", "\r", { name: "return" });
     assert.deepEqual(await answer, ["claude", "kiro"]);
+  });
+
+  test("select resolves to the chosen value and ignores space", async () => {
+    const input = new PassThrough();
+    const answer = select({ message: "Board?", choices, input, output: new PassThrough() });
+    input.emit("keypress", "", { name: "down" });
+    input.emit("keypress", " ", { name: "space" });
+    input.emit("keypress", "\r", { name: "return" });
+    assert.equal(await answer, "cursor");
   });
 
   test("Ctrl+C cancels the checkbox", async () => {

@@ -2,6 +2,25 @@
 
 A set of agent skills for building software through one workflow: plan an issue, start it, implement it in reviewable slices, verify it, open a pull request, and review it. The skills work in any project, whether a web app, an iOS or Android app, a game, a back-end service, a library, or a mix of these in one repository or several.
 
+## How it works: GitHub issues on one board
+
+skill-fleet is opinionated about where work lives. Every project that uses it runs its work through GitHub, and the installer sets that up for you:
+
+- **A GitHub repository.** Issues and pull requests live there. The installer stops when the project folder is not a GitHub repository, and shows how to create one.
+- **The GitHub CLI (`gh`), logged in.** The skills and their scripts talk to GitHub through it. When `gh` is missing, the installer offers to install it, with Homebrew on macOS or winget on Windows, and otherwise points to [cli.github.com](https://cli.github.com). When `gh` is not logged in, or its login lacks the `project` scope the board needs, it offers to fix that in your browser.
+- **A GitHub Project board linked to the repository.** The board has a `Status` field with the options `Todo`, `In progress`, `In review`, and `Done`, and a `Sprint` field with two-week sprints. When the repository has no linked board, the installer creates one called `<repository> Sprints`, or links one of your existing boards if you pick it. When a linked board lacks a status option or the Sprint field, it adds them without touching the options already in use.
+
+The skills then move each issue across the board:
+
+| Status | Set by |
+| --- | --- |
+| `Todo` | `create-issue`, when it files the issue |
+| `In progress` | `start-issue`, when work begins on a branch |
+| `In review` | `prepare-pr`, when the pull request is ready for review |
+| `Done` | GitHub's built-in project workflow, when the issue closes |
+
+`sprint-status` and `sprint-recap` read the Sprint field to report on the current sprint. The board is not optional: when it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update`, which creates or repairs it. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
+
 ## How one skill set fits every project
 
 Three layers keep the skills general:
@@ -27,20 +46,21 @@ yarn dlx skill-fleet@latest   # Yarn 2 or later; with Yarn 1, use npx
 bunx skill-fleet@latest       # Bun
 ```
 
-It asks three questions, then copies the fleet into the project so the project stays self-contained for collaborators who never run the installer:
+It first checks GitHub as described [above](#how-it-works-github-issues-on-one-board): the GitHub CLI, its login, the repository, and the board. Then it asks three questions, sets up the board, and copies the fleet into the project so the project stays self-contained for collaborators who never run the installer:
 
 1. **Which coding tools should get skill adapters?** Claude Code, Cursor, and Kiro each read skills from their own folder, so each gets a thin adapter that points at the canonical skill. Codex and OpenCode read `.agents/skills/` directly and need none.
 2. **Create or update `AGENTS.md` and `CLAUDE.md`?** Described below.
 3. **Overwrite the conflicting files?** Asked only when a file the fleet would write already exists and the fleet did not write it, or you changed it since. The answer defaults to no.
 
-Outside a Git repository it also asks whether you meant to install there. `--yes` skips every question and keeps the choices recorded by the last installation, or uses Claude Code, Cursor, and the instruction files the first time. Without a terminal, such as in CI, it asks nothing and behaves as with `--yes`. Flags answer a single question instead:
+When several boards could serve the repository, it also asks which one to use. `--yes` skips every question and keeps the choices recorded by the last installation, or uses Claude Code, Cursor, and the instruction files the first time. Without a terminal, such as in CI, it asks nothing and behaves as with `--yes`. Flags answer a single question instead:
 
 | Flag | Effect |
 | --- | --- |
 | `--claude`, `--cursor`, `--kiro`, or `--tools claude,cursor` | Choose the tools; `--tools none` writes no adapters |
 | `--instructions`, `--no-instructions` | Create and update `AGENTS.md` and `CLAUDE.md`, or leave both alone |
 | `--force` | Overwrite conflicting files without asking |
-| `--dry-run` | Show what would change and write nothing |
+| `--board <number or title>` | Use this board of the repository's owner, linking it to the repository |
+| `--dry-run` | Show what would change, on GitHub and on disk, and change nothing |
 
 The installer writes:
 
@@ -50,9 +70,10 @@ The installer writes:
 - `.agents/scripts/check-skills.mjs`: a checker anyone can run with `node .agents/scripts/check-skills.mjs`;
 - `.agents/skill-fleet-LICENSE`: the fleet's licence, which travels with the copies;
 - `.agents/skill-fleet.json`: the version, the choices, and a hash of every file it wrote;
-- `AGENTS.md` and `CLAUDE.md`: the project's instruction files, described below.
+- `AGENTS.md` and `CLAUDE.md`: the project's instruction files, described below;
+- `docs/agents/issue-tracker.md`, when it does not exist yet: the repository, owner type, board, lifecycle statuses, Sprint field, sprint time zone, and base branch, as read from GitHub. `setup-project` adds the routing and labels.
 
-It never writes anything in `docs/`. The profile there belongs to the project.
+It never changes an existing `docs/agents/` file and writes nothing else there. The profile belongs to the project.
 
 ### AGENTS.md and CLAUDE.md
 
@@ -73,9 +94,9 @@ npx skill-fleet@latest check             # verify adapters, hashes, and links
 npx skill-fleet@latest list              # list the skills
 ```
 
-Each command takes the project folder as an optional argument, such as `npx skill-fleet@latest update ../my-app`, and defaults to the current folder. `update` asks the same questions with your previous answers selected. It updates changed files, removes files the fleet no longer ships, and leaves unchanged files alone. It never overwrites a file it did not write without asking, so a project that already has its own skills with the same names is safe.
+Each command takes the project folder as an optional argument, such as `npx skill-fleet@latest update ../my-app`, and defaults to the current folder. `update` asks the same questions with your previous answers selected. It checks GitHub again, recreating or repairing the board when it changed, updates changed files, removes files the fleet no longer ships, and leaves unchanged files alone. It never overwrites a file it did not write without asking, so a project that already has its own skills with the same names is safe.
 
-In a workspace that holds several independent repositories, install at the workspace root, where cross-repository work starts. Install into a child repository as well only if people also open it on its own. Each installation then needs its own profile.
+In a workspace that holds several independent repositories, install at the workspace root, where cross-repository work starts. Install into a child repository as well only if people also open it on its own. Each installation then needs its own profile. The board links to the workspace repository, and issues from every child repository of the same owner can sit on it.
 
 To try an unreleased version, run the installer straight from GitHub with `npx github:chustert/skill-fleet`, or from a clone with `node bin/skill-fleet.mjs install <project>`.
 
@@ -91,7 +112,7 @@ It then replaces the `TODO`s in the `AGENTS.md` the installer created, and check
 
 It reads GitHub but never changes it, never opens secret files, and asks you to confirm the judgement calls: which board, how components map to repositories, the lifecycle statuses, the quality weighting, and what the product is. You can also fill the files by hand from the templates in `skills/setup-project/templates/`.
 
-A project without a board, without sprints, or without a test runner is fine. Record `None`, and the skills skip the dependent step and say so instead of failing.
+A project without a test runner, a glossary, or a contracts document is fine. Record `None`, and the skills skip the dependent step and say so instead of failing. The board is the exception: the installer always sets it up.
 
 ## The workflow
 
@@ -131,7 +152,7 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 
 | Skill | What it does | Example prompt | Suggested models |
 | --- | --- | --- | --- |
-| `sprint-status` | Summarizes your sprint, active work, and PR review queue. Works on boards without sprints, and without a board. | `/sprint-status` | Cheap model, such as Grok 4.6 or GPT-5.6-Luna |
+| `sprint-status` | Summarizes your sprint, active work, and PR review queue. | `/sprint-status` | Cheap model, such as Grok 4.6 or GPT-5.6-Luna |
 | `sprint-recap` | Recaps issues created, PRs opened and merged, reviews, and merge time during a sprint or a date window. | `/sprint-recap` | Same as `sprint-status` |
 | `create-issue` | Creates a grounded issue in the right repository, with existing labels and the board's first status. | `/create-issue Create an issue for: [problem, expected behaviour, and reproduction steps].` | Cheap model, such as Grok 4.6 or GPT-5.6-Luna |
 | `to-spec` | Turns the current discussion into a written specification. | `/to-spec` | High-tier model |
@@ -153,7 +174,7 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 
 ## Limits
 
-- The tracker is GitHub: Issues, sub-issues, and optionally a Projects board. Another tracker needs its own versions of the tracker steps and sprint scripts.
+- The tracker is GitHub: issues, sub-issues, and a Projects board. Another tracker, such as Jira or Linear, is not supported.
 - The installer and the scripts it copies into projects need Node.js 20 or later and nothing else from npm. The sprint scripts also need the GitHub CLI, authenticated with the `read:project` scope.
 - Adapters are generated for Claude Code, Cursor, and Kiro. Codex and OpenCode read `.agents/skills/` directly.
 - The skills report physical-device, target-hardware, and play-test checks as steps for a person to run. They never claim those checks passed on the strength of a build or an editor run.

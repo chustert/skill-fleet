@@ -5,6 +5,27 @@ projects lives in the project itself, in three files under `docs/agents/`.
 Skills read those files instead of naming a repository, board, command, or
 platform. The `setup-project` skill creates and fills them.
 
+## What every project has
+
+The workflow is opinionated about where work lives. Every project that uses it
+has all of the following, and the installer (`npx skill-fleet`) sets them up:
+
+- **A GitHub repository.** Issues and pull requests live there. The installer
+  stops when the project folder is not one.
+- **The GitHub CLI, logged in.** Skills and scripts call GitHub through `gh`,
+  with a token that has the `repo` and `project` scopes. The installer offers
+  to install `gh` and to log in.
+- **A project board linked to the repository.** It has a `Status` field with
+  the options `Todo`, `In progress`, `In review`, and `Done`, and an iteration
+  field, `Sprint`, with two-week sprints. The installer creates the board when
+  the repository has none, or adds what an existing board lacks. Skills move
+  every issue across it: `create-issue` to `Todo`, `start-issue` to
+  `In progress`, `prepare-pr` to `In review`. GitHub's built-in project
+  workflow moves closed issues to `Done`.
+
+When the board is missing or incomplete, a skill stops and tells the user to
+run `npx skill-fleet@latest update`, which creates or repairs it.
+
 ## Where things live
 
 The project root is the directory that contains `.agents/skills/`. In a single
@@ -16,7 +37,7 @@ repository keeps its own Git history.
 | --- | --- | --- |
 | `AGENTS.md` | project, except one section | Always-relevant instructions, working rules, and safety rules. The profile does not restate it. The fleet installer creates it when missing and maintains only the section between the `skill-fleet:begin` and `skill-fleet:end` markers. |
 | `CLAUDE.md` | project, except one section | Imports `AGENTS.md` for Claude Code with `@AGENTS.md`. The installer creates it, or adds the import, when Claude Code is an installed tool. |
-| `docs/agents/issue-tracker.md` | project | Tracker settings, the project board and its lifecycle statuses, branch conventions, and the routing table that maps each component to its repository, local path, and responsibilities. |
+| `docs/agents/issue-tracker.md` | project | Tracker settings, the project board and its lifecycle statuses, branch conventions, and the routing table that maps each component to its repository, local path, and responsibilities. The installer creates it with every setting it reads from GitHub; `setup-project` adds the routing and labels. |
 | `docs/agents/domain.md` | project | The knowledge reading order, glossary, architecture, contracts document, known boundaries, ADR location, and the project's quality weighting. |
 | `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence, and prerequisites. Also the online and paid services that need approval, protected files, and review-worktree setup. |
 | `.agents/references/` | fleet | Shared models every project uses: this file, the software-quality characteristics, the GitHub reference rules, and the platform guides. Change them in the fleet and reinstall; do not edit them in a project. |
@@ -49,9 +70,10 @@ The templates for the three profile files and for a new `AGENTS.md` live in
 2. A value marked `TODO`, or absent, is unknown. Do not fill it from
    convention, another project, or memory. Ask the user, or recommend
    `setup-project`.
-3. `None` is a real value. The project deliberately has no board, no iteration
-   field, no glossary, or no test harness. Skip the step that depends on it and
-   report it as not configured, not as a failure.
+3. `None` is a real value. The project deliberately has no glossary, no
+   contracts document, or no test harness. Skip the step that depends on it and
+   report it as not configured, not as a failure. The board rows never allow
+   `None`: without a board, stop and recommend `npx skill-fleet@latest update`.
 4. When the profile and the live system disagree, such as a renamed board or a
    removed command, trust the live evidence, report the disagreement, and
    propose the profile correction. Do not edit the profile silently from

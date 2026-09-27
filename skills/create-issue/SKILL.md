@@ -261,11 +261,12 @@ Resolve all required metadata before creating the issue:
    The available names and descriptions are authoritative. Do not confuse the
    issue type with its labels. For a user-owned repository, or when the
    settings record `None`, let labels carry the classification.
-5. When the tracker settings name a project board, resolve the board with that
-   exact title owned by the named owner, its status field, and the exact option
-   mapped to the new-issue lifecycle role, usually `Todo`. Resolve every
-   project, field, and option ID dynamically; never hard-code one. When the
-   settings record `None` for the board, skip the board.
+5. Resolve the project board the tracker settings name, with that exact title
+   owned by the named owner, its status field, and the exact option mapped to
+   the new-issue lifecycle role, usually `Todo`. Resolve every project, field,
+   and option ID dynamically; never hard-code one. The board is required: if the
+   settings name none, or GitHub no longer has it, stop and tell the user to run
+   `npx skill-fleet@latest update`, which creates or repairs the board.
 6. If the user supplied a parent, resolve it to an unambiguous issue URL and
    verify that it exists. The new issue must be added as a sub-issue of that
    parent. A full URL or repository-qualified reference is authoritative. A
@@ -287,14 +288,14 @@ version. Current clients may support `--label`, `--type`, `--project`, and
 `--parent` directly.
 
 Use an explicit repository, title, body file, selected labels, the selected
-issue type when one applies, the configured board when one applies, and the
-verified parent when present. Add the new issue as a sub-issue of that parent
+issue type when one applies, the board, and the verified parent when
+present. Add the new issue as a sub-issue of that parent
 through the GitHub parent relationship. Do not pass an assignee. Do not add a
 milestone unless the user explicitly requested one.
 
 Create the issue exactly once and capture its URL, number, node ID, and
-repository. Then, when a board is configured, resolve the issue's board item and
-set its status to the resolved new-issue option. If project automation already
+repository. Then resolve the issue's board item and set its status to the
+resolved new-issue option. If project automation already
 set that option, verify it without issuing a redundant update.
 
 If creation succeeds but a later metadata update fails, repair the same issue.
@@ -322,7 +323,7 @@ Read the issue and, when configured, its board item back from GitHub. Confirm:
 - the assignee list is empty;
 - the new issue identifies the supplied parent and the parent lists the new
   issue as a sub-issue when requested; and
-- when a board is configured, the issue belongs to it with the new-issue status.
+- the issue belongs to the board with the new-issue status.
 
 If an external automation adds an assignee or changes another field after
 creation, report the observed result. Do not silently remove or overwrite
@@ -337,7 +338,7 @@ sub-issues, and any issue or pull request cited as grounding. Inside the issue
 body itself, use the plain `#number` or `owner/repo#number` autolink instead.
 
 Also report the repository and owning component, selected form, issue type when
-one applies, labels, board status or that no board is configured, parent and
+one applies, labels, board status, parent and
 sub-issue relationship when present, the project sources used to ground added
 factual claims, and any attachment or configuration that could not be applied.
 

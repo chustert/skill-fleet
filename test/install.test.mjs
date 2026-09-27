@@ -7,11 +7,12 @@ import { afterEach, beforeEach, describe, test } from "node:test";
 import * as checks from "../lib/check-skills.mjs";
 import { main, parseArgs, UsageError } from "../lib/cli.mjs";
 import { ROOT, skillNames } from "../lib/install.mjs";
+import { FakeGitHub } from "./fake-github.mjs";
 
 const SKILLS = skillNames();
 
-/** Run the command line with scripted answers. Resolves to { code, output }. */
-async function run(argv, { cwd, interactive = false, answers = {} } = {}) {
+/** Run the command line with scripted answers against a fake GitHub. Resolves to { code, output, asked }. */
+async function run(argv, { cwd, interactive = false, answers = {}, github = new FakeGitHub() } = {}) {
   let output = "";
   const sink = { write: (text) => { output += text; } };
   const asked = [];
@@ -22,20 +23,33 @@ async function run(argv, { cwd, interactive = false, answers = {} } = {}) {
     },
     confirm: async ({ message, initial }) => {
       asked.push(message);
-      if (message.includes("Git repository")) return answers.notGit ?? true;
       if (message.includes("AGENTS.md")) return answers.instructions ?? initial;
       if (message.includes("Overwrite")) return answers.overwrite ?? false;
+      if (message.includes("Install gh")) return answers.installGh ?? initial;
+      if (message.includes("Log in")) return answers.login ?? initial;
+      if (message.includes("scope")) return answers.refresh ?? initial;
+      if (message.includes("needs changes")) return answers.repair ?? initial;
       return initial;
     },
+    select: async ({ message, choices }) => {
+      asked.push(message);
+      return answers.board ? answers.board(choices) : choices[0].value;
+    },
   };
-  const code = await main(argv, { cwd: cwd ?? process.cwd(), stdout: sink, stderr: sink, interactive, prompts });
+  const io = { cwd: cwd ?? process.cwd(), stdout: sink, stderr: sink, interactive, prompts, github: github.io() };
+  const code = await main(argv, io);
   return { code, output, asked };
 }
 
-function tempProject(name = "project") {
+/** A temporary folder that is a Git repository with a GitHub origin, unless remote is null. */
+function tempProject(name = "project", remote = `https://github.com/acme/${name}.git`) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "skill-fleet-"));
   const project = path.join(dir, name);
   fs.mkdirSync(project);
+  if (remote !== null) {
+    spawnSync("git", ["init", "-q", project]);
+    if (remote) spawnSync("git", ["-C", project, "remote", "add", "origin", remote]);
+  }
   return { dir, project };
 }
 
@@ -71,9 +85,9 @@ describe("install", () => {
     assert.match(output, /setup-project/);
   });
 
-  test("never writes the profile", async () => {
+  test("writes only the tracker settings in the profile", async () => {
     await install();
-    assert.equal(exists(project, "docs"), false);
+    assert.deepEqual(fs.readdirSync(path.join(project, "docs/agents")), ["issue-tracker.md"]);
   });
 
   test("scripts stay executable", { skip: process.platform === "win32" }, async () => {
@@ -152,7 +166,7 @@ describe("install", () => {
     const { code, output } = await install("--dry-run");
     assert.equal(code, 0);
     assert.match(output, /would create/);
-    assert.deepEqual(fs.readdirSync(project), []);
+    assert.deepEqual(fs.readdirSync(project), [".git"]);
   });
 
   test("refuses to install into the fleet itself", async () => {
@@ -197,8 +211,7 @@ describe("AGENTS.md and CLAUDE.md", () => {
   const install = (...argv) => run(["install", project, ...argv]);
 
   test("new files name the project from its Git remote", async () => {
-    spawnSync("git", ["init", "-q", project]);
-    spawnSync("git", ["-C", project, "remote", "add", "origin", "git@github.com:acme/space-game.git"]);
+    spawnSync("git", ["-C", project, "remote", "set-url", "origin", "git@github.com:acme/space-game.git"]);
     const { code, output } = await install();
     assert.equal(code, 0, output);
     const agents = read(project, "AGENTS.md");
@@ -208,13 +221,6 @@ describe("AGENTS.md and CLAUDE.md", () => {
     assert.match(output, /fill the TODOs in AGENTS\.md/);
     assert.equal(checks.findBlock(read(project, "CLAUDE.md")), "@AGENTS.md\n");
     assert.deepEqual(checks.check(project), []);
-  });
-
-  test("without a remote the repository stays TODO", async () => {
-    await install();
-    const agents = read(project, "AGENTS.md");
-    assert.ok(agents.startsWith("# demo-game\n"));
-    assert.match(agents, /Repository: TODO/);
   });
 
   test("an existing AGENTS.md keeps its content", async () => {
@@ -305,10 +311,7 @@ describe("AGENTS.md and CLAUDE.md", () => {
 describe("questions", () => {
   let dir;
   let project;
-  beforeEach(() => {
-    ({ dir, project } = tempProject());
-    spawnSync("git", ["init", "-q", project]);
-  });
+  beforeEach(() => ({ dir, project } = tempProject()));
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
   const ask = (answers, ...argv) => run(["install", project, ...argv], { interactive: true, answers });
 
@@ -350,16 +353,203 @@ describe("questions", () => {
     assert.doesNotMatch(fs.readFileSync(edited, "utf8"), /Local edit\./);
   });
 
-  test("a directory outside Git asks first", async () => {
-    const { dir: other, project: plain } = tempProject();
-    try {
-      const { code, output } = await run(["install", plain], { interactive: true, answers: { notGit: false } });
-      assert.equal(code, 1);
-      assert.match(output, /Cancelled/);
-      assert.deepEqual(fs.readdirSync(plain), []);
-    } finally {
-      fs.rmSync(other, { recursive: true, force: true });
+  test("a folder that is not a GitHub repository stops with instructions", async () => {
+    for (const remote of [null, "", "https://gitlab.com/acme/app.git"]) {
+      const { dir: other, project: plain } = tempProject("plain", remote);
+      try {
+        const { code, output } = await run(["install", plain], { interactive: true });
+        assert.equal(code, 1, String(remote));
+        assert.match(output, /must be a GitHub repository/);
+        assert.match(output, /gh repo create --source \. --private --push/);
+        assert.equal(exists(plain, ".agents"), false);
+      } finally {
+        fs.rmSync(other, { recursive: true, force: true });
+      }
     }
+  });
+});
+
+describe("GitHub setup", () => {
+  let dir;
+  let project;
+  beforeEach(() => ({ dir, project } = tempProject("space-game")));
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const install = (github, options = {}, ...argv) => run(["install", project, ...argv], { github, ...options });
+  const board = (github) => github.boards[0];
+  const field = (b, name) => b.fields.find((f) => f.name === name);
+
+  test("creates a linked board with the workflow's statuses and sprints", async () => {
+    const github = new FakeGitHub();
+    const { code, output } = await install(github);
+    assert.equal(code, 0, output);
+    assert.match(output, /How the workflow runs/);
+    assert.match(output, /Created the project board "space-game Sprints"/);
+    const created = board(github);
+    assert.ok(github.repo("acme/space-game").linked.has(created.id));
+    assert.deepEqual(field(created, "Status").options.map((o) => o.name), ["Todo", "In progress", "In review", "Done"]);
+    const sprint = field(created, "Sprint");
+    assert.equal(sprint.dataType, "ITERATION");
+    assert.equal(sprint.configuration.duration, 14);
+    assert.equal(sprint.configuration.startDate, "2026-09-21");
+    assert.equal(sprint.configuration.iterations.length, 6);
+    assert.equal(sprint.configuration.iterations[1].startDate, "2026-10-05");
+    const manifest = JSON.parse(read(project, checks.MANIFEST));
+    assert.deepEqual(manifest.github, { repository: "acme/space-game",
+      board: { owner: "acme", number: 1, title: "space-game Sprints", url: created.url } });
+    const tracker = read(project, "docs/agents/issue-tracker.md");
+    assert.match(tracker, /^\| Project board \| `space-game Sprints` owned by `acme`: https:\/\/github\.com\/users\/acme\/projects\/1 \|$/m);
+    assert.match(tracker, /^\| Lifecycle statuses \| new → `Todo`; started → `In progress`; in review → `In review`; done → `Done`\. \|$/m);
+    assert.match(tracker, /^\| Iteration field \| `Sprint`\. \|$/m);
+    assert.match(tracker, /^\| Sprint time zone \| `Europe\/Berlin`\. \|$/m);
+    assert.match(tracker, /^\| Owner type \| `User`\. \|$/m);
+    assert.match(tracker, /^## Routing/m);
+  });
+
+  test("a second install reuses the board and changes nothing on GitHub", async () => {
+    const github = new FakeGitHub();
+    await install(github);
+    const before = github.mutations().length;
+    const { code, output } = await install(github);
+    assert.equal(code, 0, output);
+    assert.equal(github.boards.length, 1);
+    assert.equal(github.mutations().length, before);
+    assert.doesNotMatch(output, /How the workflow runs/);
+  });
+
+  test("an existing linked board is repaired without losing its options", async () => {
+    const github = new FakeGitHub();
+    const existing = github.addBoard({ title: "Roadmap", linkedTo: "acme/space-game", statuses: ["Todo", "In Progress", "Done"] });
+    const ids = field(existing, "Status").options.map((o) => o.id);
+    const { code, output, asked } = await install(github, { interactive: true });
+    assert.equal(code, 0, output);
+    assert.ok(asked.some((q) => q.includes('"Roadmap" needs changes')));
+    const options = field(existing, "Status").options;
+    assert.deepEqual(options.map((o) => o.name), ["Todo", "In Progress", "Done", "In review"]);
+    assert.deepEqual(options.slice(0, 3).map((o) => o.id), ids);
+    assert.equal(field(existing, "Sprint").dataType, "ITERATION");
+    assert.equal(github.boards.length, 1);
+    assert.match(read(project, "docs/agents/issue-tracker.md"), /started → `In Progress`/);
+  });
+
+  test("an existing iteration field is kept under its own name", async () => {
+    const github = new FakeGitHub();
+    github.addBoard({ title: "Board", linkedTo: "acme/space-game", statuses: ["Todo", "In progress", "In review", "Done"],
+      iteration: "Iteration" });
+    const { code } = await install(github);
+    assert.equal(code, 0);
+    assert.equal(github.mutations().length, 0);
+    assert.match(read(project, "docs/agents/issue-tracker.md"), /^\| Iteration field \| `Iteration`\. \|$/m);
+  });
+
+  test("declining the repair stops before writing anything", async () => {
+    const github = new FakeGitHub();
+    github.addBoard({ title: "Roadmap", linkedTo: "acme/space-game" });
+    const { code, output } = await install(github, { interactive: true, answers: { repair: false } });
+    assert.equal(code, 1);
+    assert.match(output, /needs those changes/);
+    assert.equal(github.mutations().length, 0);
+    assert.equal(exists(project, ".agents"), false);
+  });
+
+  test("several linked boards need a choice", async () => {
+    const github = new FakeGitHub();
+    github.addBoard({ title: "One", linkedTo: "acme/space-game" });
+    github.addBoard({ title: "Two", linkedTo: "acme/space-game" });
+    const refused = await install(github);
+    assert.equal(refused.code, 1);
+    assert.match(refused.output, /Choose one with --board: #1 "One", #2 "Two"/);
+    const chosen = await install(github, { interactive: true, answers: { board: (choices) => choices[1].value } });
+    assert.equal(chosen.code, 0, chosen.output);
+    assert.equal(JSON.parse(read(project, checks.MANIFEST)).github.board.title, "Two");
+  });
+
+  test("--board links one of the owner's boards", async () => {
+    const github = new FakeGitHub();
+    const other = github.addBoard({ title: "Team board", statuses: ["Todo", "In progress", "In review", "Done"],
+      iteration: "Sprint" });
+    const { code, output } = await install(github, {}, "--board", "Team board");
+    assert.equal(code, 0, output);
+    assert.ok(github.repo("acme/space-game").linked.has(other.id));
+    assert.match(output, /Linked the project board "Team board"/);
+    assert.equal(github.boards.length, 1);
+  });
+
+  test("with no linked board, a user can pick one of the owner's boards", async () => {
+    const github = new FakeGitHub();
+    const other = github.addBoard({ title: "Team board", statuses: ["Todo", "In progress", "In review", "Done"],
+      iteration: "Sprint" });
+    const { code, asked } = await install(github, { interactive: true,
+      answers: { board: (choices) => choices.find((c) => c.value?.title === "Team board").value } });
+    assert.equal(code, 0);
+    assert.ok(asked.some((q) => q.startsWith("No project board is linked")));
+    assert.ok(github.repo("acme/space-game").linked.has(other.id));
+  });
+
+  test("a dry run changes nothing on GitHub", async () => {
+    const github = new FakeGitHub();
+    const { code, output } = await install(github, {}, "--dry-run");
+    assert.equal(code, 0);
+    assert.match(output, /would create the project board "space-game Sprints" owned by acme, linked to acme\/space-game/);
+    assert.match(output, /would create docs\/agents\/issue-tracker\.md/);
+    assert.equal(github.mutations().length, 0);
+    assert.equal(exists(project, ".agents"), false);
+  });
+
+  test("an existing tracker file is left alone, with a note when it names another board", async () => {
+    fs.mkdirSync(path.join(project, "docs/agents"), { recursive: true });
+    fs.writeFileSync(path.join(project, "docs/agents/issue-tracker.md"), "# Mine\n");
+    const { code, output } = await install(new FakeGitHub());
+    assert.equal(code, 0);
+    assert.equal(read(project, "docs/agents/issue-tracker.md"), "# Mine\n");
+    assert.match(output, /does not name the board "space-game Sprints"/);
+  });
+
+  test("a missing gh stops with the install command, or installs it when accepted", async () => {
+    const refused = await install(new FakeGitHub({ installed: false }));
+    assert.equal(refused.code, 1);
+    assert.match(refused.output, /Install the GitHub CLI with brew install gh/);
+    assert.equal(exists(project, ".agents"), false);
+    const github = new FakeGitHub({ installed: false });
+    const accepted = await install(github, { interactive: true });
+    assert.equal(accepted.code, 0, accepted.output);
+    assert.deepEqual(github.runs, [["brew", "install", "gh"]]);
+    const linux = await install(new FakeGitHub({ installed: false, platform: "linux", programs: [] }), { interactive: true });
+    assert.equal(linux.code, 1);
+    assert.match(linux.output, /follow https:\/\/cli\.github\.com/);
+    assert.ok(!linux.asked.some((q) => q.includes("Install gh")));
+  });
+
+  test("winget installs gh on Windows", async () => {
+    const github = new FakeGitHub({ installed: false, platform: "win32", programs: ["winget"] });
+    assert.equal((await install(github, { interactive: true })).code, 0);
+    assert.deepEqual(github.runs[0].slice(0, 4), ["winget", "install", "--id", "GitHub.cli"]);
+  });
+
+  test("a missing login stops, or logs in when accepted", async () => {
+    const refused = await install(new FakeGitHub({ loggedIn: false }));
+    assert.equal(refused.code, 1);
+    assert.match(refused.output, /gh auth login --scopes project/);
+    const github = new FakeGitHub({ loggedIn: false });
+    const accepted = await install(github, { interactive: true });
+    assert.equal(accepted.code, 0, accepted.output);
+    assert.ok(github.calls.some((c) => c.args.slice(0, 2).join(" ") === "auth login"));
+  });
+
+  test("a login without the project scope is refreshed when accepted", async () => {
+    const refused = await install(new FakeGitHub({ scopes: ["repo", "read:org"] }));
+    assert.equal(refused.code, 1);
+    assert.match(refused.output, /gh auth refresh --scopes project/);
+    const github = new FakeGitHub({ scopes: ["repo", "read:org"] });
+    const accepted = await install(github, { interactive: true });
+    assert.equal(accepted.code, 0, accepted.output);
+    assert.ok(github.scopes.includes("project"));
+  });
+
+  test("an organization records that issue types exist", async () => {
+    await install(new FakeGitHub({ ownerType: "Organization" }));
+    const tracker = read(project, "docs/agents/issue-tracker.md");
+    assert.match(tracker, /^\| Owner type \| `Organization`\. \|$/m);
+    assert.match(tracker, /^\| Issue types \| `Resolve from GitHub`\. \|$/m);
   });
 });
 

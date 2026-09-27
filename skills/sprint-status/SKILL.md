@@ -1,6 +1,6 @@
 ---
 name: sprint-status
-description: Report the user's current GitHub sprint - issues assigned to them in the active iteration of the project board, what is in progress vs still outstanding, a short code-state note on each in-progress item, and the PR review queue in both directions. Works without iterations or without a board. Use when the user asks about their sprint, standup, what they are working on, what is outstanding, or which PRs need reviewing.
+description: Report the user's current GitHub sprint - issues assigned to them in the active iteration of the project board, what is in progress vs still outstanding, a short code-state note on each in-progress item, and the PR review queue in both directions. Use when the user asks about their sprint, standup, what they are working on, what is outstanding, or which PRs need reviewing.
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -13,13 +13,15 @@ in-flight item.
 ## 1. Collect the data
 
 Read the tracker settings in `docs/agents/issue-tracker.md` and map them to
-flags. If a value the command needs is still `TODO`, say so and recommend
+flags. The board is required: if the settings name none, say so and tell the
+user to run `npx skill-fleet@latest update`, which creates or repairs it. If
+another value the command needs is still `TODO`, say so and recommend
 `setup-project` rather than guessing.
 
 | Tracker setting | Flag |
 | --- | --- |
 | Project board owner | `--owner <owner>` |
-| Project board title | `--project "<exact title>"`. Omit when the board is `None`. |
+| Project board title | `--project "<exact title>"` |
 | Status field | `--status-field "<name>"`, when it is not `Status` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Lifecycle statuses | `--todo-status`, `--started-status`, `--review-status`, `--done-status`, when they differ from `Todo`, `In progress`, `In review`, and `Done` |
@@ -45,20 +47,20 @@ different sprint.
 
 If it exits asking for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project` — do not try to work around it. If it reports
-that it found no board with that title, or several, say so and point at the
-tracker settings; do not substitute another project.
+that it found no board with that title, or several, or that the board has no
+iteration field, say so, point at the tracker settings, and recommend
+`npx skill-fleet@latest update`; do not substitute another project.
 
 Read the JSON before writing anything. The fields that matter:
 
 | Field | Meaning |
 | --- | --- |
-| `mode` | `sprint` (board with iterations), `board` (board without iterations), or `no-board` |
-| `sprint` | Active iteration, with `day` N of `duration`. `null` when no iteration contains today or the board has none |
-| `sprintItems.inProgress` / `.inReview` / `.todo` | The user's open items in this sprint, or on the whole board in `board` mode |
+| `sprint` | Active iteration, with `day` N of `duration`. `null` when no iteration contains today |
+| `upcoming` | The next iterations. When `sprint` is `null` and this is empty, the board's sprints have run out: tell the user to add iterations in the board's Sprint field settings |
+| `sprintItems.inProgress` / `.inReview` / `.todo` | The user's open items in this sprint |
 | `sprintItems.otherStatuses` | Open items in statuses outside the lifecycle mapping, such as `Blocked` or `No status` |
 | `unscheduledActive` | **Started but in no iteration** — always surface this, see §3 |
 | `backlogAssigned` | Assigned, open, no iteration. Count only, unless asked |
-| `assignedOpen` | In `no-board` mode: every open issue assigned to the user in scope |
 | `<item>.subIssues` | Parent-issue progress: `total`, `completed`, `children` across repositories |
 | `prs.awaitingMyReview` | Review formally requested from the user |
 | `prs.mineAwaitingOthers` | The user's own open PRs |
@@ -69,8 +71,8 @@ the repository and number when the script already returned one.
 
 ## 2. Establish the code state
 
-For every item in `inProgress`, `inReview`, and `unscheduledActive` (or the
-active items in `assignedOpen`), spend a little effort finding out where the
+For every item in `inProgress`, `inReview`, and `unscheduledActive`, spend a
+little effort finding out where the
 code actually is. Keep it to a quick pass — the goal is one or two factual
 sentences per item, not a review.
 
@@ -132,9 +134,8 @@ These are the things a plain board dump gets wrong. Check each one.
 Terminal markdown, tight, in this order. Drop any section that is empty except
 **Needs your review** and **Outstanding**, which should say "nothing" explicitly.
 Use the board's own status names in headings when they differ from the defaults.
-In `board` mode, replace the sprint heading with the board title. In `no-board`
-mode, report `assignedOpen` as **Assigned to you** and say that no board is
-configured.
+When no iteration contains today, say so under the board's title instead of the
+sprint heading.
 
 Every issue and PR reference is a markdown link to its `url`, per the
 [GitHub reference rules](../../references/github-references.md).
