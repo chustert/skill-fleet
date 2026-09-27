@@ -1,6 +1,6 @@
 ---
 name: verify-work
-description: Verify local implementation work against the originating GitHub issue and approved specification using the exact documented project commands, direct runtime evidence for each affected platform, explicit device, hardware, and hosted-service limitations, and boundary compatibility checks, then run pr-review as a separate code-quality pass. Use after implementation and before pull-request preparation. Observe and report only; never fix, commit, push, deploy, create a pull request, or change issue state.
+description: Verify local implementation work against the originating GitHub issue and approved specification using the exact documented project commands, direct runtime evidence for each affected platform, explicit device, hardware, and hosted-service limitations, and boundary compatibility checks, then run pr-review in a fresh-context subagent as a separate code-quality pass. Use after implementation and before pull-request preparation. Observe and report only; never fix, commit, push, deploy, create a pull request, or change issue state.
 ---
 
 # Verify work
@@ -184,10 +184,31 @@ independent green test suites.
 
 ## Run the independent code review
 
-After freezing the acceptance matrix and command evidence, invoke `pr-review`
-against the same exact diff and base. Pass it the issue or specification source,
-the affected paths, and the verification evidence, but let it inspect the code
-fresh.
+After freezing the acceptance matrix and command evidence, run `pr-review`
+against the same exact diff and base in a subagent, following the
+[subagent rules](../../references/subagents.md). This context has watched the
+work being built and checked, so a review run here would not be independent.
+
+Brief the subagent with:
+
+- the issue or specification source, as a GitHub link;
+- every affected repository, its base ref and commit, its current commit, its
+  worktree path, and whether the review covers uncommitted changes;
+- the affected paths and the exclusions recorded above;
+- the commands you ran and their results, and the runtime observations with
+  their artifact paths, so that `pr-review` can reuse the evidence that fits
+  its checks; and
+- the limits: review only, change nothing, post nothing, contact no online
+  service, and report back any check that needs approval.
+
+Leave out the acceptance matrix verdicts, your view of the code, and anything
+said about why the code was written as it was. `pr-review` reaches its own
+verdict on both axes.
+
+When the host cannot start a subagent, run `pr-review` inline and state in the
+report that the review was not independent. When the subagent's report asks
+for an approval, put the request to the user rather than running the step
+yourself.
 
 The review must keep two axes distinct:
 
@@ -200,9 +221,10 @@ The review must keep two axes distinct:
 
 Do not let a good result on one axis cancel findings on the other. Do not repair
 review findings inside this workflow. If the target is local work, keep the
-review local. If the user explicitly selected a GitHub pull request, follow
-`pr-review`'s PR workflow and its defined permission boundary for the report;
-otherwise do not post anything remotely.
+review local. If the user explicitly selected a GitHub pull request, the
+subagent follows `pr-review`'s PR workflow but returns the report to you, and
+you post it as `pr-review`'s `Publish the GitHub PR report` step describes.
+Otherwise do not post anything remotely.
 
 ## Report and stopping point
 
@@ -223,7 +245,8 @@ Return one self-contained verification record containing:
 6. **Compatibility:** contract evidence plus rollout and rollback order for
    changes that cross a boundary.
 7. **Code review:** the separate Spec and Engineering Standards results from
-   `pr-review`, including findings and unverified risks.
+   `pr-review`, including findings and unverified risks, and whether the review
+   ran in a subagent or inline.
 8. **Next action:** return failures to `implement`, request missing evidence, or
    state that the verified local work is ready for approved PR preparation.
 
