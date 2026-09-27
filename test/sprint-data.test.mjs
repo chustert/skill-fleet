@@ -110,7 +110,7 @@ describe("classification", () => {
   test("a sprint board buckets items and finds unscheduled work", () => {
     const items = [item(1, "In progress", "S2"), item(2, "Todo", "S2"), item(3, "In review"), item(4, "Todo"),
       item(5, "Blocked", "S2"), item(6, "Done", "S2", ["me"], "CLOSED"), item(7, "In progress", "S2", ["someone"])];
-    const out = sd.classify(items, "me", NAMES, "S2", true);
+    const out = sd.classify(items, "me", NAMES, "S2");
     const numbers = (list) => list.map((i) => i.number);
     assert.deepEqual(numbers(out.sprintItems.inProgress), [1]);
     assert.deepEqual(numbers(out.sprintItems.todo), [2]);
@@ -120,17 +120,15 @@ describe("classification", () => {
     assert.deepEqual(numbers(out.backlogAssigned), [3, 4]);
   });
 
-  test("a board without iterations reports everything by status", () => {
-    const names = { todo: "Backlog", started: "Doing", review: "Review", done: "Shipped" };
-    const out = sd.classify([item(1, "Doing"), item(2, "Review"), item(3, "Backlog")], "me", names, null, false);
+  test("the board's own status names map to the lifecycle roles", () => {
+    const names = { todo: "Todo", started: "In Progress", review: "In review", done: "Done" };
+    const out = sd.classify([item(1, "In Progress", "S2"), item(2, "In Progress")], "me", names, "S2");
     assert.deepEqual(out.sprintItems.inProgress.map((i) => i.number), [1]);
-    assert.deepEqual(out.sprintItems.inReview.map((i) => i.number), [2]);
-    assert.deepEqual(out.sprintItems.todo.map((i) => i.number), [3]);
-    assert.deepEqual(out.unscheduledActive, []);
+    assert.deepEqual(out.unscheduledActive.map((i) => i.number), [2]);
   });
 
   test("no current sprint leaves the sprint empty", () => {
-    assert.deepEqual(sd.classify([item(1, "Todo", "S1")], "me", NAMES, null, true).sprintItems.todo, []);
+    assert.deepEqual(sd.classify([item(1, "Todo", "S1")], "me", NAMES, null).sprintItems.todo, []);
   });
 
   test("the configured status and iteration fields are read", () => {
@@ -167,7 +165,8 @@ describe("arguments and search scope", () => {
     assert.equal(args.names.todo, "Todo");
     assert.equal(args.statusField, "Status");
     assert.throws(() => sd.parseArgs(["--project", "Board"]), sd.UsageError);
-    assert.throws(() => sd.parseArgs(["--owner", "a", "--date", "tomorrow"]), sd.UsageError);
+    assert.throws(() => sd.parseArgs(["--owner", "acme"]), /--project is required/);
+    assert.throws(() => sd.parseArgs(["--owner", "a", "--project", "B", "--date", "tomorrow"]), sd.UsageError);
   });
 
   test("comment excerpts collapse whitespace and stop at 400 characters", () => {

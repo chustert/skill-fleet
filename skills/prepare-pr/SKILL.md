@@ -105,8 +105,8 @@ Propose all of the following in one review packet:
   and rollout notes, known limitations, and practical reviewer instructions;
 - any suggested labels, reviewers, or companion PRs, without applying them;
 - the exact actions that approval will authorize, including moving each issue
-  closed by a ready-for-review PR to the in-review status when the tracker
-  settings configure a board.
+  closed by a ready-for-review PR to the in-review status on the board the
+  tracker settings name.
 
 Do not add or require screenshots, screen recordings, or empty visual-evidence
 sections as part of the PR body prepared by this skill, unless the repository's
@@ -208,10 +208,10 @@ Immediately before creating or updating the PR:
 7. Read the created PR back from GitHub and verify its number, URL, repository,
    base, head, title, body, draft/ready status, and the absence of accidental
    hard-wrapped lines in prose and list items.
-8. When the verified PR is ready for review and the tracker settings configure
-   a board, move each issue named by an approved closing reference such as
-   `Closes` to the option mapped to the in-review lifecycle role, usually
-   `In review`, on that board. Resolve the project item, status field, and
+8. When the verified PR is ready for review, move each issue named by an
+   approved closing reference such as `Closes` to the option mapped to the
+   in-review lifecycle role, usually `In review`, on the board the tracker
+   settings name. Resolve the project item, status field, and
    option from GitHub instead of hard-coding identifiers. Read the current
    status first; if it is already the in-review status, verify it without
    issuing a redundant update. Do not change parent, umbrella, or related-only
@@ -219,8 +219,9 @@ Immediately before creating or updating the PR:
    PR. If the closing issue is not on the configured board, appears on several
    applicable boards, has no in-review option, or cannot be updated, stop rather
    than adding it to a board or guessing; report the unresolved status clearly
-   while keeping the verified PR intact. When no board is configured, skip this
-   step and say so.
+   while keeping the verified PR intact. If the settings name no board, or
+   GitHub no longer has it, say so and tell the user to run
+   `npx skill-fleet@latest update`, which creates or repairs the board.
 
 If creation fails or GitHub reports an existing PR, do not retry in a way that
 could create duplicates. Report the exact state and propose the smallest next
@@ -235,7 +236,7 @@ and parent or umbrella issue the reply names. In the PR body itself, use the
 plain `#number` or `owner/repo#number` autolink instead.
 
 For a ready PR, also name each closing issue and confirm that its board status
-is the in-review status, that no board is configured, or why that transition
+is the in-review status, or why that transition
 could not be completed. If the user asked to open or show the PR and an
 appropriate browser/page-opening capability is available, open the verified URL
 as well; the link in the response is still required.

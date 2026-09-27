@@ -330,11 +330,12 @@ to the started status:
    own work, cannot be assigned to the repository, or lacks permission, do not
    guess another person or alter existing assignees. Keep the successfully
    created local branches intact and report why assignment was not synchronized.
-5. When the tracker settings name a project board, resolve the issue's item on
-   that board, its status field, and the exact option mapped to the started
-   lifecycle role, usually `In progress`. Never hard-code project, field, item,
-   or option identifiers. When the settings record `None` for the board, skip
-   steps 5 to 8 and report that no board is configured.
+5. Resolve the issue's item on the project board the tracker settings name,
+   its status field, and the exact option mapped to the started lifecycle role,
+   usually `In progress`. Never hard-code project, field, item, or option
+   identifiers. If the settings name no board, or GitHub no longer has it, keep
+   the local branches, report that the status was not synchronized, and tell
+   the user to run `npx skill-fleet@latest update`, which creates or repairs the board.
 6. Read the current status first. If it is the new-issue status, update it to
    the started status. If it is already the started status, verify it without
    issuing a redundant update.
@@ -378,9 +379,8 @@ Report a self-contained start record containing:
   commit, or the explicitly authorized reason it was pushed earlier;
 - the authenticated starter login and verified assignment while preserving the
   existing assignees, or the precise reason assignment could not be completed;
-- the active issue's board and verified started status, that no board is
-  configured, or the precise reason the lifecycle transition could not be
-  completed;
+- the active issue's board and verified started status, or the precise
+  reason the lifecycle transition could not be completed;
 - the smallest safe next implementation step, identified by its slice ID;
 - `implement` for continuous implementation, or `implement-slice` to implement
   one small slice and wait for the developer's review before continuing.

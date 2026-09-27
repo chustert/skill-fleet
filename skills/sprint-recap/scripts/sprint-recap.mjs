@@ -217,7 +217,7 @@ const USAGE = `Usage: node sprint-recap.mjs --owner <owner> [--project <number o
   [--date YYYY-MM-DD | --since YYYY-MM-DD [--until YYYY-MM-DD]]
 
 --date selects the sprint containing that date. --since and --until select an
-explicit window instead, for a board without iterations or no board at all.`;
+explicit window instead, such as a month or a quarter.`;
 
 export function parseArgs(argv) {
   let values;
@@ -273,7 +273,10 @@ export function selectPeriod(args, now) {
     const selected = args.date ?? zoneToday(now, args.timezone);
     let field;
     [board, field, period] = deps.resolveIterations(args.owner, args.project, selected, args.iterationField);
-    if (!field) throw new UsageError("The board has no iteration field. Use --since and --until.");
+    if (!field) {
+      throw new UsageError("The board has no iteration field. Run npx skill-fleet@latest update, which adds it, "
+        + "or pass --since and --until.");
+    }
     if (!period) throw new UsageError(`No sprint contains ${selected}. Choose a date inside an iteration.`);
   }
   const [start, end] = window(period, args.timezone, now);

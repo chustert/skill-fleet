@@ -57,31 +57,33 @@ because every later skill will trust it.
 
 ## 2. Read the tracker
 
-Run read-only queries and record names, not IDs.
+The installer has already made sure the project is a GitHub repository, that
+`gh` is installed and logged in with the `repo` and `project` scopes, and that
+a project board is linked to the repository with the workflow's `Status`
+options and an iteration field. It recorded the repository, owner type, board,
+lifecycle statuses, iteration field, sprint time zone, and base branch in
+`docs/agents/issue-tracker.md`. Keep those values; fill the rest. Run read-only
+queries and record names, not IDs.
 
-- Owner type:
-  `gh api graphql -f query='query($l:String!){repositoryOwner(login:$l){__typename}}' -f l=<owner>`.
+- Check the recorded board against GitHub: `gh project field-list <number>
+  --owner <owner> --format json` lists its `Status` options and iteration field.
+  If the board is missing, unlinked, or lacks an option or the iteration field,
+  do not repair it here. Tell the user to run `npx skill-fleet@latest update`,
+  which creates or repairs it, and continue with the rest.
+- If `docs/agents/issue-tracker.md` predates the installer and names no board,
+  ask the user to run `npx skill-fleet@latest update` first. The board is
+  required; never record `None` for it.
 - Issue types, for an organization only:
   `gh api graphql -f query='query($l:String!){organization(login:$l){issueTypes(first:25){nodes{name description isEnabled}}}}' -f l=<owner>`.
-  Record `Resolve from GitHub` when enabled types exist, otherwise `None`.
+  Keep `Resolve from GitHub` when enabled types exist, otherwise record `None`.
 - Labels: `gh label list --repo <owner/repo> --limit 200 --json name,description`.
   Propose the mapping from kinds of work to existing labels.
 - Issue forms and the pull-request template: list `.github/ISSUE_TEMPLATE/` and
   `.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE/`. The
   skills use them when present, so note that they exist.
-- Boards: `gh project list --owner <owner> --format json`, then for a candidate
-  `gh project field-list <number> --owner <owner> --format json` to read the
-  status field's options and any iteration field. If `gh` reports a missing
-  `read:project` scope, tell the user to run `gh auth refresh -s read:project`
-  and continue with the rest.
-- When several boards could apply, or none clearly does, ask which board the
-  project uses, or record `None`. Do not choose by guesswork.
-- Map the four lifecycle roles, new, started, in review, and done, to the
-  board's status options. When no option fits a role, record the gap. Do not
-  propose creating options unless the user asks.
-- The fallback repository for issues with an unclear owner, the rule for work
-  that spans components, and the default base branch come from the repository
-  metadata and the user. Propose them; the user confirms.
+- The fallback repository starts as the default repository. In a workspace of
+  several repositories, propose where issues with an unclear owner belong, and
+  the rule for work that spans components; the user confirms.
 
 ## 3. Map components and platforms
 
@@ -230,8 +232,8 @@ Present a compact summary:
   approval.
 
 Ask the user to confirm or correct the judgement calls: routing ownership,
-board choice, lifecycle mapping, fallback repository, quality weighting, the
-project intent, and anything marked proposed. Apply the corrections.
+fallback repository, quality weighting, the project intent, and anything
+marked proposed. Apply the corrections.
 
 ## 10. Check the installation
 

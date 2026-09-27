@@ -18,7 +18,9 @@ Read the tracker settings and map them to flags the same way `sprint-status`
 does: `--owner`, `--project`, `--iteration-field` when the board has several,
 and one `--repo` per repository in the routing table. Pass the sprint time zone
 from the tracker settings as `--timezone`. If a value the command needs is
-still `TODO`, say so and recommend `setup-project` rather than guessing.
+still `TODO`, say so and recommend `setup-project` rather than guessing. The
+board is required: if the settings name none, tell the user to run
+`npx skill-fleet@latest update`, which creates or repairs it.
 
 Run from the project root:
 
@@ -36,8 +38,8 @@ iteration covers its full duration. The current iteration stops at collection ti
 The date selects a sprint, not a cutoff within it. No matching iteration or a future
 iteration is an error, not a reason to substitute a calendar fortnight.
 
-When the board has no iteration field, the project has no board, or the user
-asks for a period other than a sprint, pass `--since YYYY-MM-DD` and optionally
+When the user asks for a period other than a sprint, such as a month or a
+quarter, pass `--since YYYY-MM-DD` and optionally
 `--until YYYY-MM-DD` (inclusive, default today) instead of `--date`. Name that
 window in the recap rather than calling it a sprint.
 

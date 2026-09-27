@@ -165,13 +165,14 @@ export function localToday() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-const USAGE = `Usage: node sprint-data.mjs --owner <owner> [--project <number or exact title>]
+const USAGE = `Usage: node sprint-data.mjs --owner <owner> --project <number or exact title>
   [--repo <owner/repo> ...] [--status-field <name>] [--iteration-field <name>]
   [--todo-status <name>] [--started-status <name>] [--review-status <name>]
   [--done-status <name>] [--date YYYY-MM-DD]
 
-Omit --project when the project has no board. Omit --repo to cover every
-repository the owner has.`;
+The project is the board named in docs/agents/issue-tracker.md. Omit --repo to
+cover every repository the owner has.`;
+const REPAIR = "Run npx skill-fleet@latest update, which creates or repairs the board.";
 
 export function parseArgs(argv) {
   let values;
@@ -197,9 +198,10 @@ export function parseArgs(argv) {
   }
   if (values.help) return { help: USAGE };
   if (!values.owner) throw new UsageError(`--owner is required.\n\n${USAGE}`);
+  if (!values.project) throw new UsageError(`--project is required.\n\n${USAGE}`);
   return {
     owner: values.owner,
-    project: values.project ?? null,
+    project: values.project,
     repos: values.repo,
     statusField: values["status-field"],
     iterationField: values["iteration-field"] ?? null,
@@ -258,7 +260,7 @@ export function pickProject(nodes, title, owner) {
   const matches = nodes.filter((p) => p && p.title === title && !p.closed);
   if (matches.length !== 1) {
     throw new UsageError(`Expected exactly one open project titled ${JSON.stringify(title)} owned by `
-      + `${owner}, found ${matches.length}. Check docs/agents/issue-tracker.md.`);
+      + `${owner}, found ${matches.length}. Check docs/agents/issue-tracker.md. ${REPAIR}`);
   }
   return matches[0];
 }
@@ -295,8 +297,8 @@ export function currentIteration(field, today) {
 
 /**
  * The board, its iteration field name, and the current sprint. A board without
- * an iteration field returns null for the field and sprint, so callers can
- * report by status alone.
+ * an iteration field returns null for the field and sprint; the callers stop
+ * and point at the installer, which adds the field.
  */
 export function resolveIterations(owner, project, today, iterationField = null) {
   const board = resolveProject(owner, project);
@@ -362,21 +364,14 @@ function subIssues(content) {
 }
 
 /** Bucket the user's board items by lifecycle role and sprint membership. */
-export function classify(items, me, names, sprintTitle, hasIterations) {
+export function classify(items, me, names, sprintTitle) {
   const mine = items.filter((i) => i.assignees.includes(me));
   const openMine = mine.filter((i) => i.state === "OPEN");
   const active = [names.started, names.review];
-  let scope;
-  let unscheduled;
-  let backlog;
-  if (hasIterations) {
-    scope = mine.filter((i) => sprintTitle && i.iteration === sprintTitle);
-    // Work that is underway but never got dropped into an iteration.
-    unscheduled = openMine.filter((i) => i.iteration === null && active.includes(i.status));
-    backlog = openMine.filter((i) => i.iteration === null);
-  } else {
-    [scope, unscheduled, backlog] = [mine, [], []];
-  }
+  const scope = mine.filter((i) => sprintTitle && i.iteration === sprintTitle);
+  // Work that is underway but never got dropped into an iteration.
+  const unscheduled = openMine.filter((i) => i.iteration === null && active.includes(i.status));
+  const backlog = openMine.filter((i) => i.iteration === null);
   const bucket = (status) => scope.filter((i) => i.status === status && i.state === "OPEN");
   const known = new Set(Object.values(names));
   const other = {};
@@ -404,12 +399,6 @@ export function scopeFlags(owner, repos) {
 function prRows(queryArgs, owner, repos) {
   const out = gh(["search", "prs", ...queryArgs, ...scopeFlags(owner, repos), "--state=open", "--limit=40",
     "--json", "repository,number,title,url,createdAt,updatedAt,isDraft"]);
-  return JSON.parse(out || "[]");
-}
-
-function assignedIssues(me, owner, repos) {
-  const out = gh(["search", "issues", `--assignee=${me}`, ...scopeFlags(owner, repos), "--state=open",
-    "--limit=100", "--json", "repository,number,title,url,createdAt,updatedAt"]);
   return JSON.parse(out || "[]");
 }
 
@@ -458,28 +447,19 @@ export function collect(args) {
   const me = viewerLogin();
   const result = { generatedFor: me, today, owner: args.owner, statusNames: args.names };
 
-  if (args.project) {
-    const [board, iterationField, current, upcoming] = resolveIterations(
-      args.owner, args.project, today, args.iterationField);
-    const items = fetchItems(args.owner, board.number)
-      .map((node) => flatten(node, args.statusField, iterationField))
-      .filter(Boolean);
-    Object.assign(result, {
-      mode: iterationField ? "sprint" : "board",
-      project: { title: board.title, url: board.url },
-      iterationField,
-      sprint: current,
-      upcoming: upcoming.slice(0, 2),
-      ...classify(items, me, args.names, current?.title ?? null, Boolean(iterationField)),
-    });
-  } else {
-    Object.assign(result, {
-      mode: "no-board",
-      project: null,
-      sprint: null,
-      assignedOpen: assignedIssues(me, args.owner, args.repos),
-    });
-  }
+  const [board, iterationField, current, upcoming] = resolveIterations(
+    args.owner, args.project, today, args.iterationField);
+  if (!iterationField) throw new UsageError(`The board "${board.title}" has no iteration field. ${REPAIR}`);
+  const items = fetchItems(args.owner, board.number)
+    .map((node) => flatten(node, args.statusField, iterationField))
+    .filter(Boolean);
+  Object.assign(result, {
+    project: { title: board.title, url: board.url },
+    iterationField,
+    sprint: current,
+    upcoming: upcoming.slice(0, 2),
+    ...classify(items, me, args.names, current?.title ?? null),
+  });
 
   const reviewsForMe = prRows([`--review-requested=${me}`], args.owner, args.repos);
   const mentions = prRows([`--mentions=${me}`], args.owner, args.repos);
