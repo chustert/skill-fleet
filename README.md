@@ -19,7 +19,7 @@ The skills then move each issue across the board:
 | `In review` | `prepare-pr`, when the pull request is ready for review |
 | `Done` | GitHub's built-in project workflow, when the issue closes |
 
-`sprint-status` and `sprint-recap` read the Sprint field to report on the current sprint. The board is not optional: when it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update`, which creates or repairs it. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
+`sprint-status`, `sprint-recap`, and `repos-report` read the Sprint field to report on the current sprint. The board is not optional: when it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update`, which creates or repairs it. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
 
 ## How one skill set fits every project
 
@@ -154,6 +154,7 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 | --- | --- | --- | --- |
 | `sprint-status` | Summarizes your sprint, active work, and PR review queue. | `/sprint-status` | Cheap model, such as Grok 4.6 or GPT-5.6-Luna |
 | `sprint-recap` | Recaps issues created, PRs opened and merged, reviews, and merge time during a sprint or a date window. | `/sprint-recap` | Same as `sprint-status` |
+| `repos-report` | Shows icon-coded at-a-glance tables of each repository's branches and worktrees, what is active or dormant, and where each open sprint issue lives locally. Changes nothing. | `/repos-report` | Same as `sprint-status` |
 | `create-issue` | Creates a grounded issue in the right repository, with existing labels and the board's first status. | `/create-issue Create an issue for: [problem, expected behaviour, and reproduction steps].` | Cheap model, such as Grok 4.6 or GPT-5.6-Luna |
 | `to-spec` | Turns the current discussion into a written specification. | `/to-spec` | High-tier model |
 
@@ -175,7 +176,7 @@ Invoke a skill as `/name` in Claude Code and Cursor, or `$name` in Codex.
 ## Limits
 
 - The tracker is GitHub: issues, sub-issues, and a Projects board. Another tracker, such as Jira or Linear, is not supported.
-- The installer and the scripts it copies into projects need Node.js 20 or later and nothing else from npm. The sprint scripts also need the GitHub CLI, authenticated with the `read:project` scope.
+- The installer and the scripts it copies into projects need Node.js 20 or later and nothing else from npm. The sprint and `repos-report` scripts also need the GitHub CLI, authenticated with the `read:project` scope.
 - Adapters are generated for Claude Code, Cursor, and Kiro. Codex and OpenCode read `.agents/skills/` directly.
 - The skills report physical-device, target-hardware, and play-test checks as steps for a person to run. They never claim those checks passed on the strength of a build or an editor run.
 
