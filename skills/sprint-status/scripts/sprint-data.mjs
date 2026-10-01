@@ -155,7 +155,7 @@ export function addDays(date, days) {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-function daysBetween(start, end) {
+export function daysBetween(start, end) {
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
 }
 
@@ -172,7 +172,7 @@ const USAGE = `Usage: node sprint-data.mjs --owner <owner> --project <number or 
 
 The project is the board named in docs/agents/issue-tracker.md. Omit --repo to
 cover every repository the owner has.`;
-const REPAIR = "Run npx skill-fleet@latest update, which creates or repairs the board.";
+export const REPAIR = "Run npx skill-fleet@latest update, which creates or repairs the board.";
 
 export function parseArgs(argv) {
   let values;
@@ -309,7 +309,7 @@ export function resolveIterations(owner, project, today, iterationField = null) 
   return [board, field.name, current, upcoming];
 }
 
-function fetchItems(owner, number) {
+export function fetchItems(owner, number) {
   const nodes = [];
   let after = null;
   for (;;) {

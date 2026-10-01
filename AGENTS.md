@@ -12,7 +12,7 @@ This repository is the skill fleet: agent skills that work in any project, plus 
 - `lib/install.mjs`: plans and writes an installation. `agentsBlock()` holds the text of the skill-fleet section it maintains in a project's `AGENTS.md`.
 - `lib/check-skills.mjs`: the checks, shared by the installer and copied into every project as `.agents/scripts/check-skills.mjs`.
 - `lib/prompts.mjs`: the terminal checkbox and yes-or-no questions.
-- `test/`: tests for the package, the skills' content, and the sprint scripts. They are not published and never reach a project. `test/fake-github.mjs` stands in for `gh`, so no test calls GitHub.
+- `test/`: tests for the package, the skills' content, and the sprint and `repos-report` scripts. They are not published and never reach a project. `test/fake-github.mjs` stands in for `gh`, so no test calls GitHub.
 - `package.json`: the package name, the version recorded in each project's manifest, and what npm publishes.
 - `.github/workflows/`: `test.yml` runs the tests on Linux, macOS, and Windows; `publish.yml` stages a tagged version on npm for the maintainer to approve.
 
@@ -47,7 +47,7 @@ For a change to the installer or to how skills read the profile, also install in
 node bin/skill-fleet.mjs install <temporary-directory> --yes
 ```
 
-The sprint scripts call GitHub; test them against a real board only with read-only commands.
+The sprint and `repos-report` scripts call GitHub; test them against a real board only with read-only commands. The `repos-report` script also runs `git fetch` in each clone it reads.
 
 ## Releasing
 
