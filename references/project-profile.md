@@ -23,8 +23,11 @@ has all of the following, and the installer (`npx skill-fleet`) sets them up:
   `In progress`, `prepare-pr` to `In review`. GitHub's built-in project
   workflow moves closed issues to `Done`.
 
-When the board is missing or incomplete, a skill stops and tells the user to
-run `npx skill-fleet@latest update`, which creates or repairs it.
+When the board is missing or incomplete, a skill stops and asks the user to
+run `npx skill-fleet@latest update`, which creates or repairs it. The command
+changes the project board on GitHub, so it runs only with the user's approval,
+after `--dry-run` shows what it would change. An agent never runs `install` or
+`update` without that approval.
 
 ## Where things live
 
@@ -73,7 +76,9 @@ The templates for the three profile files and for a new `AGENTS.md` live in
 3. `None` is a real value. The project deliberately has no glossary, no
    contracts document, or no test harness. Skip the step that depends on it and
    report it as not configured, not as a failure. The board rows never allow
-   `None`: without a board, stop and recommend `npx skill-fleet@latest update`.
+   `None`: without a board, stop and ask the user to run
+   `npx skill-fleet@latest update`. It changes the board on GitHub, so it runs
+   only with the user's approval, after `--dry-run` shows what it would change.
 4. When the profile and the live system disagree, such as a renamed board or a
    removed command, trust the live evidence, report the disagreement, and
    propose the profile correction. Do not edit the profile silently from
