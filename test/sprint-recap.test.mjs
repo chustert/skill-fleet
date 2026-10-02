@@ -28,6 +28,14 @@ describe("windows and time zones", () => {
     assert.equal(recap.iso(recap.zoneMidnight("2026-01-01", "UTC")), "2026-01-01T00:00:00Z");
   });
 
+  test("a day without a midnight starts when the clock jumps", () => {
+    // America/Santiago moves from UTC-4 to UTC-3 at midnight, so 6 September 2026 starts at 01:00.
+    assert.equal(recap.iso(recap.zoneMidnight("2026-09-06", "America/Santiago")), "2026-09-06T04:00:00Z");
+    assert.equal(recap.iso(recap.zoneMidnight("2026-09-07", "America/Santiago")), "2026-09-07T03:00:00Z");
+    assert.equal(recap.iso(recap.zoneMidnight("2026-03-29", "Asia/Beirut")), "2026-03-28T22:00:00Z");
+    assert.equal(recap.iso(recap.zoneMidnight("2026-04-05", "America/Santiago")), "2026-04-05T04:00:00Z");
+  });
+
   test("the current sprint stops at collection time", () => {
     const now = new Date("2026-09-22T23:00:00Z");
     const [, end] = recap.window({ start: "2026-09-21", end: "2026-10-04" }, "Europe/Berlin", now);

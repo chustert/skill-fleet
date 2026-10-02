@@ -44,6 +44,10 @@ export function zoneMidnight(date, timeZone) {
   const guess = Date.UTC(y, m - 1, d);
   let instant = guess - zoneOffset(new Date(guess), timeZone);
   instant = guess - zoneOffset(new Date(instant), timeZone);
+  // Where daylight saving starts at midnight, as in America/Santiago, midnight never happens and the
+  // instant above falls in the evening before. The day then starts when the clock jumps, which is
+  // midnight at the offset in force that evening.
+  if (zoneToday(new Date(instant), timeZone) < date) instant = guess - zoneOffset(new Date(instant), timeZone);
   return new Date(instant);
 }
 
