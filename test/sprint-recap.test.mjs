@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
 import * as recap from "../skills/sprint-recap/scripts/sprint-recap.mjs";
 
+const SCRIPT = fileURLToPath(new URL("../skills/sprint-recap/scripts/sprint-recap.mjs", import.meta.url));
+// Without PATH, a gh call fails to start instead of reaching GitHub.
+const OFFLINE = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== "PATH")),
+  PATH: "" };
 const saved = { ...recap.deps };
 afterEach(() => Object.assign(recap.deps, saved));
 
@@ -146,6 +150,11 @@ describe("scope", () => {
     }
     assert.throws(() => recap.parseArgs([...window, "--repo", "owner/repo"]), /template placeholder/);
   });
+
+  test("--help prints the usage without a scope", () => {
+    assert.match(recap.parseArgs(["--help"]).help, /^Usage: node sprint-recap\.mjs --owner/);
+    assert.equal(recap.main(["--help"]), recap.parseArgs(["--help"]).help);
+  });
 });
 
 describe("collection", () => {
@@ -209,10 +218,9 @@ describe("collection", () => {
   });
 
   test("the warning goes to stderr before any GitHub call", () => {
-    const script = fileURLToPath(new URL("../skills/sprint-recap/scripts/sprint-recap.mjs", import.meta.url));
     // --until before --since stops the run before it reaches GitHub.
-    const res = spawnSync(process.execPath, [script, "--owner", "acme", "--repo", "acme/app",
-      "--since", "2026-09-10", "--until", "2026-09-01"], { encoding: "utf8" });
+    const res = spawnSync(process.execPath, [SCRIPT, "--owner", "acme", "--repo", "acme/app",
+      "--since", "2026-09-10", "--until", "2026-09-01"], { encoding: "utf8", env: OFFLINE });
     assert.equal(res.status, 1);
     assert.equal(res.stderr, `Warning: ${recap.UTC_FALLBACK}\n--until is before --since.\n`);
   });

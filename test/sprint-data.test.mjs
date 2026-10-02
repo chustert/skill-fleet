@@ -6,6 +6,10 @@ import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
 
 const NAMES = { todo: "Todo", started: "In progress", review: "In review", done: "Done" };
 const realGh = sd.io.gh;
+const SCRIPT = fileURLToPath(new URL("../skills/sprint-status/scripts/sprint-data.mjs", import.meta.url));
+// Without PATH, a gh call fails to start instead of reaching GitHub.
+const OFFLINE = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== "PATH")),
+  PATH: "" };
 
 function item(number, status, iteration = null, assignees = ["me"], state = "OPEN") {
   return {
@@ -181,11 +185,16 @@ describe("arguments and search scope", () => {
   });
 
   test("the command line stops with a usage error when no scope is given", () => {
-    const script = fileURLToPath(new URL("../skills/sprint-status/scripts/sprint-data.mjs", import.meta.url));
-    const res = spawnSync(process.execPath, [script, "--owner", "acme", "--project", "Board"], { encoding: "utf8" });
+    const res = spawnSync(process.execPath, [SCRIPT, "--owner", "acme", "--project", "Board"],
+      { encoding: "utf8", env: OFFLINE });
     assert.equal(res.status, 1);
     assert.equal(res.stdout, "");
     assert.ok(res.stderr.startsWith(`${sd.SCOPE_REQUIRED}\n\nUsage:`), res.stderr);
+  });
+
+  test("--help prints the usage without a scope", () => {
+    assert.match(sd.parseArgs(["--help"]).help, /^Usage: node sprint-data\.mjs --owner/);
+    assert.equal(sd.main(["--help"]), sd.parseArgs(["--help"]).help);
   });
 
   test("flags map to settings with defaults", () => {
@@ -205,7 +214,7 @@ describe("arguments and search scope", () => {
   test("a board problem asks the user to run the update, with approval and a dry run first", () => {
     assert.match(sd.REPAIR, /^Ask the user to run npx skill-fleet@latest update, which creates or repairs the board\./);
     assert.match(sd.REPAIR, /changes the project board on GitHub, so it runs only with the user's approval/);
-    assert.match(sd.REPAIR, /--dry-run/);
+    assert.match(sd.REPAIR, /after a preview with npx skill-fleet@latest update --dry-run\.$/);
     assert.throws(() => sd.pickProject([], "Board", "acme"), (error) => error.message.endsWith(sd.REPAIR));
   });
 

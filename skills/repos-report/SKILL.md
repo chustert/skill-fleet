@@ -1,6 +1,6 @@
 ---
 name: repos-report
-description: Report every local branch and worktree in each of the project's local repositories, opening with icon-coded at-a-glance tables per repository, then grouped into active work, empty issue branches, other people's work, and dormant branches that are safe to remove or need a decision, plus a map of where each open sprint issue lives locally. Use when the user asks which branches or worktrees are active or dormant, where an issue is being worked on, or what can be cleaned up. It fetches and prunes remote-tracking refs in each clone unless run with --no-fetch, and changes no branch, worktree, or working-tree file.
+description: Report every local branch and worktree in each of the project's local repositories, opening with icon-coded at-a-glance tables per repository, then grouped into active work, empty issue branches, other people's work, and dormant branches that are safe to remove or need a decision, plus a map of where each open sprint issue lives locally. Use when the user asks which branches or worktrees are active or dormant, where an issue is being worked on, or what can be cleaned up. It fetches and prunes remote-tracking refs in each clone unless run with --no-fetch, and changes no local branch, worktree, or working-tree file.
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -169,8 +169,8 @@ When many share a parent folder, name the folder once and list the folder names.
 <Two or three sentences: where real work is in flight, and how much is removable.>
 
 Branches are sorted by PR state, not ahead/behind counts, because squash merges make
-merged branches still look "ahead" of the default branch. No branch, worktree, or file has been
-removed or changed.
+merged branches still look "ahead" of the default branch. No local branch, worktree, or file has
+been removed or changed.
 
 <At a glance: the --format overview output, verbatim.>
 

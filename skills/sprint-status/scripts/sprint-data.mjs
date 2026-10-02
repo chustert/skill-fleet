@@ -175,7 +175,8 @@ The project is the board named in docs/agents/issue-tracker.md. Pass --repo for
 each repository in its routing table. --all-repos covers every repository the
 owner has instead.`;
 export const REPAIR = "Ask the user to run npx skill-fleet@latest update, which creates or repairs the board. "
-  + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with --dry-run.";
+  + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with "
+  + "npx skill-fleet@latest update --dry-run.";
 export const SCOPE_REQUIRED = "Pass --repo <owner/repo> for each repository to cover, or --all-repos to cover "
   + "every repository the owner has.";
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;

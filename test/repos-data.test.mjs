@@ -447,6 +447,7 @@ describe("a clone with branches in every state", () => {
     assert.equal(report.repositories.length, 1);
     assert.ok(report.sprint.error.endsWith(sd.REPAIR), report.sprint.error);
     assert.match(report.sprint.error, /Ask the user to run npx skill-fleet@latest update/);
-    assert.match(report.sprint.error, /only with the user's approval, after a preview with --dry-run/);
+    assert.match(report.sprint.error,
+      /only with the user's approval, after a preview with npx skill-fleet@latest update --dry-run\./);
   });
 });
