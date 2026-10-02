@@ -1004,21 +1004,26 @@ describe("check and list", () => {
     assert.ok(checks.check(project).includes("cursor adapter for implement differs from the canonical skill"));
   });
 
-  test("missing and stray adapters are reported, and a skill only a tool has gets a note", () => {
+  test("missing and stray adapters are reported, and a skill only a tool has and leftovers get a note", () => {
     fs.unlinkSync(path.join(project, ".claude/skills/teach/SKILL.md"));
-    // A stray adapter the manifest records, such as one for a skill the fleet dropped.
+    // A stray adapter the manifest records, such as one for a skill the fleet dropped, and a recorded extra file.
     write(project, ".claude/skills/old-skill/SKILL.md", "stray");
+    write(project, ".claude/skills/implement/extra.md", "extra");
     const manifest = JSON.parse(read(project, checks.MANIFEST));
     manifest.files[".claude/skills/old-skill/SKILL.md"] = checks.sha256("stray");
+    manifest.files[".claude/skills/implement/extra.md"] = checks.sha256("extra");
     fs.writeFileSync(path.join(project, checks.MANIFEST), JSON.stringify(manifest));
+    // Files beside a fleet adapter that the manifest does not record, such as leftovers of an earlier full copy.
     write(project, ".claude/skills/tdd/notes.md", "Notes.\n");
+    write(project, ".claude/skills/tdd/references/mocking.md", "[gone](../missing.md)\n");
     write(project, ".claude/skills/deploy-notes/SKILL.md", "---\nname: deploy-notes\ndescription: Claude only.\n---\n\nBody.\n");
     const errors = checks.check(project);
     assert.ok(errors.includes("missing claude adapter for teach"));
     assert.ok(errors.includes("unexpected claude skill file: .claude/skills/old-skill/SKILL.md"));
-    assert.ok(errors.includes("unexpected claude skill file: .claude/skills/tdd/notes.md"));
-    assert.ok(!errors.some((e) => e.includes("deploy-notes")), errors.join("\n"));
-    assert.deepEqual(checks.unmanaged(project), [".claude/skills/deploy-notes/"]);
+    assert.ok(errors.includes("unexpected claude skill file: .claude/skills/implement/extra.md"));
+    assert.ok(!errors.some((e) => e.includes("deploy-notes") || e.includes(".claude/skills/tdd/")), errors.join("\n"));
+    assert.deepEqual(checks.unmanaged(project), [".claude/skills/deploy-notes/", ".claude/skills/tdd/notes.md",
+      ".claude/skills/tdd/references/mocking.md"]);
   });
 
   test("links are checked in a project's own skills, not in files left in a fleet skill's folder", () => {
