@@ -101,6 +101,17 @@ describe("content", () => {
     }
   });
 
+  test("every request for the update names the dry run first and the approval rule", () => {
+    const request = "`npx skill-fleet@latest update --dry-run`, and then `npx skill-fleet@latest update` once";
+    for (const file of shippedFiles().filter((name) => name.endsWith(".md"))) {
+      const text = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\s+/g, " ");
+      const mentions = text.split("`npx skill-fleet@latest update`").length - 1;
+      if (!mentions) continue;
+      assert.equal(text.split(request).length - 1, mentions, `${file} asks for the update without its dry run`);
+      assert.ok(text.includes("unless the user approves it"), `${file} states who may run the update`);
+    }
+  });
+
   test("the fleet and every borrowed skill carry an MIT licence", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
     assert.equal(pkg.license, "MIT");

@@ -235,9 +235,10 @@ describe("arguments and search scope", () => {
   });
 
   test("a board problem asks the user to run the update, with approval and a dry run first", () => {
-    assert.match(sd.REPAIR, /^Ask the user to run npx skill-fleet@latest update, which creates or repairs the board\./);
-    assert.match(sd.REPAIR, /changes the project board on GitHub, so it runs only with the user's approval/);
-    assert.match(sd.REPAIR, /after a preview with npx skill-fleet@latest update --dry-run\.$/);
+    assert.match(sd.REPAIR, /^Ask the user to run npx skill-fleet@latest update --dry-run, and then npx skill-fleet@latest update once they approve the changes it lists\. /);
+    assert.match(sd.REPAIR, / Do not run either command yourself unless the user approves it\. /);
+    assert.match(sd.REPAIR, / add --yes: without a terminal, the update changes the board only with it\. /);
+    assert.match(sd.REPAIR, /Adding --force, which overwrites files changed by hand, needs its own approval\.$/);
     assert.throws(() => sd.pickProject([], "Board", "acme"), (error) => error.message.endsWith(sd.REPAIR));
   });
 

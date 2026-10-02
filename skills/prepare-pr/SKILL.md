@@ -230,9 +230,10 @@ Immediately before creating or updating the PR:
    than adding it to a board or guessing; report the unresolved status clearly
    while keeping the verified PR intact. If the settings name no board, or
    GitHub no longer has it, say so and ask the user to run
-   `npx skill-fleet@latest update`, which creates or repairs the board. The
-   command changes the project board on GitHub, so it runs only with the user's
-   approval, after `--dry-run` shows what it would change.
+   `npx skill-fleet@latest update --dry-run`, and then
+   `npx skill-fleet@latest update` once they approve the changes it lists. The
+   update creates or repairs the project board on GitHub. Do not run either
+   command yourself unless the user approves it.
 
 If creation fails or GitHub reports an existing PR, do not retry in a way that
 could create duplicates. Report the exact state and propose the smallest next

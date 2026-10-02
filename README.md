@@ -19,7 +19,7 @@ The skills then move each issue across the board:
 | `In review` | `prepare-pr`, when the pull request is ready for review |
 | `Done` | GitHub's built-in project workflow, when the issue closes |
 
-`sprint-status`, `sprint-recap`, and `repos-report` read the Sprint field to report on the current sprint. The board is not optional. When it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update`, which creates or repairs it. The command changes the project board on GitHub, so it runs only with your approval, after a `--dry-run` preview. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
+`sprint-status`, `sprint-recap`, and `repos-report` read the Sprint field to report on the current sprint. The board is not optional. When it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update --dry-run`, and then `npx skill-fleet@latest update` once you approve the changes it lists. The update creates or repairs the project board on GitHub, so a skill runs neither command without your approval. If you ask the agent to run the update, it adds `--yes`, which the update needs without a terminal; `--force`, which overwrites files you changed by hand, needs its own approval. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
 
 ## How one skill set fits every project
 

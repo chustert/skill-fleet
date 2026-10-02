@@ -24,10 +24,13 @@ has all of the following, and the installer (`npx skill-fleet`) sets them up:
   workflow moves closed issues to `Done`.
 
 When the board is missing or incomplete, a skill stops and asks the user to
-run `npx skill-fleet@latest update`, which creates or repairs it. The command
-changes the project board on GitHub, so it runs only with the user's approval,
-after `--dry-run` shows what it would change. An agent never runs `install` or
-`update` without that approval.
+run `npx skill-fleet@latest update --dry-run`, and then
+`npx skill-fleet@latest update` once they approve the changes it lists. The
+update creates or repairs the project board on GitHub. An agent runs neither
+command, nor `install`, unless the user approves it. If the user asks the agent
+to run the update, the agent adds `--yes`: without a terminal, the update
+changes the board only with it. Adding `--force`, which overwrites files
+changed by hand, needs its own approval.
 
 ## Where things live
 
@@ -77,8 +80,9 @@ The templates for the three profile files and for a new `AGENTS.md` live in
    contracts document, or no test harness. Skip the step that depends on it and
    report it as not configured, not as a failure. The board rows never allow
    `None`: without a board, stop and ask the user to run
-   `npx skill-fleet@latest update`. It changes the board on GitHub, so it runs
-   only with the user's approval, after `--dry-run` shows what it would change.
+   `npx skill-fleet@latest update --dry-run`, and then
+   `npx skill-fleet@latest update` once they approve the changes it lists. Do
+   not run either command yourself unless the user approves it.
 4. When the profile and the live system disagree, such as a renamed board or a
    removed command, trust the live evidence, report the disagreement, and
    propose the profile correction. Do not edit the profile silently from

@@ -452,9 +452,8 @@ describe("a clone with branches in every state", () => {
     const report = rd.collect(args, dir);
     assert.equal(report.repositories.length, 1);
     assert.ok(report.sprint.error.endsWith(sd.REPAIR), report.sprint.error);
-    assert.match(report.sprint.error, /Ask the user to run npx skill-fleet@latest update/);
-    assert.match(report.sprint.error,
-      /only with the user's approval, after a preview with npx skill-fleet@latest update --dry-run\./);
+    assert.match(report.sprint.error, /Ask the user to run npx skill-fleet@latest update --dry-run, and then /);
+    assert.match(report.sprint.error, /Do not run either command yourself unless the user approves it\./);
   });
 
   test("the sprint time zone picks today; without it the machine's clock does, with a warning", () => {

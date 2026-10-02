@@ -34,10 +34,10 @@ of the owner, or the routing table says the board tracks all of them. Never
 pass the template's placeholder `owner/repo`. The script rejects it. If another
 value the command needs is still `TODO`, say so and recommend `setup-project`
 rather than guessing. The board is required: if the settings name none, ask the
-user to run `npx skill-fleet@latest update`, which creates or repairs the
-board. It changes the project board on GitHub, so it runs only with the user's
-approval, after a preview with `--dry-run`. Do not run it yourself without that
-approval.
+user to run `npx skill-fleet@latest update --dry-run`, and then
+`npx skill-fleet@latest update` once they approve the changes it lists. The
+update creates or repairs the project board on GitHub. Do not run either
+command yourself unless the user approves it.
 
 Run from the project root:
 

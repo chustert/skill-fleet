@@ -343,10 +343,15 @@ describe("AGENTS.md and CLAUDE.md", () => {
     assert.ok(agents.includes("[`acme/space-game`](https://github.com/acme/space-game)"));
     const block = checks.findBlock(agents);
     assert.match(block, /## Agent workflow/);
-    assert.match(block, /ask the user to run `npx skill-fleet@latest update`, which creates or repairs it\. /);
-    assert.match(block, /changes the project board on GitHub, so it runs only with the user's approval, after `--dry-run`/);
+    const request = "ask the user to run `npx skill-fleet@latest update --dry-run`, and then "
+      + "`npx skill-fleet@latest update` once they approve the changes it lists.";
+    const approval = "Do not run either command yourself unless the user approves it.";
+    assert.ok(block.includes(`When it is missing or incomplete, ${request} The update creates or repairs the project `
+      + `board on GitHub. ${approval}`), block);
     assert.match(block, /Do not edit by hand the files that `\.agents\/skill-fleet\.json` records/);
-    assert.match(block, /The update can also change the project board, so it runs only with the user's approval, after `--dry-run`\./);
+    assert.ok(block.includes(`To update the fleet's files, ${request} The update can also change the project board on `
+      + `GitHub. ${approval} If the user asks you to run the update yourself, add \`--yes\``), block);
+    assert.match(block, /Adding `--force`, which overwrites files changed by hand, needs its own approval\./);
     assert.match(output, /fill the TODOs in AGENTS\.md/);
     assert.equal(checks.findBlock(read(project, "CLAUDE.md")), "@AGENTS.md\n");
     assert.deepEqual(checks.check(project), []);

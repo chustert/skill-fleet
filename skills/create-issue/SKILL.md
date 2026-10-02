@@ -290,9 +290,10 @@ Resolve all required metadata before creating the issue:
    the new-issue lifecycle role, usually `Todo`. Resolve every project, field,
    and option ID dynamically; never hard-code one. The board is required: if the
    settings name none, or GitHub no longer has it, stop and ask the user to run
-   `npx skill-fleet@latest update`, which creates or repairs the board. The
-   command changes the project board on GitHub, so it runs only with the user's
-   approval, after `--dry-run` shows what it would change.
+   `npx skill-fleet@latest update --dry-run`, and then
+   `npx skill-fleet@latest update` once they approve the changes it lists. The
+   update creates or repairs the project board on GitHub. Do not run either
+   command yourself unless the user approves it.
 6. If the user supplied a parent, resolve it to an unambiguous issue URL and
    verify that it exists. The new issue must be added as a sub-issue of that
    parent. A full URL or repository-qualified reference is authoritative. A

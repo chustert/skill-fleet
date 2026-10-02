@@ -144,14 +144,14 @@ user confirms it. Run read-only queries and record names, not IDs.
 - Check the recorded board against GitHub: `gh project field-list <number>
   --owner <owner> --format json` lists its `Status` options and iteration field.
   If the board is missing, unlinked, or lacks an option or the iteration field,
-  do not repair it here. Ask the user to run `npx skill-fleet@latest update`,
-  which creates or repairs the board. The update changes the project board on
-  GitHub, so it runs only with the user's approval, after
-  `npx skill-fleet@latest update --dry-run` shows what it would change.
-  Continue with the rest.
+  do not repair it here. Ask the user to run
+  `npx skill-fleet@latest update --dry-run`, and then
+  `npx skill-fleet@latest update` once they approve the changes it lists. The
+  update creates or repairs the project board on GitHub. Do not run either
+  command yourself unless the user approves it. Continue with the rest.
 - If `docs/agents/issue-tracker.md` predates the installer and names no board,
-  ask the user to run `npx skill-fleet@latest update` first, with the same
-  approval and dry run. The installer never changes an existing
+  ask for the update first, as the previous item describes. The installer
+  never changes an existing
   `docs/agents/issue-tracker.md`, so record the board it creates or links. The
   board is required; never record `None` for it.
 - Issue types, for an organization only:

@@ -214,9 +214,11 @@ The project is the board named in docs/agents/issue-tracker.md. Pass --repo for
 each repository in its routing table. --all-repos covers every repository the
 owner has instead. Pass that file's sprint time zone as --timezone. Without it
 or --date, today's date comes from this machine's clock and the script warns.`;
-export const REPAIR = "Ask the user to run npx skill-fleet@latest update, which creates or repairs the board. "
-  + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with "
-  + "npx skill-fleet@latest update --dry-run.";
+export const REPAIR = "Ask the user to run npx skill-fleet@latest update --dry-run, and then "
+  + "npx skill-fleet@latest update once they approve the changes it lists. The update creates or repairs the "
+  + "project board on GitHub. Do not run either command yourself unless the user approves it. If the user asks "
+  + "you to run the update yourself, add --yes: without a terminal, the update changes the board only with it. "
+  + "Adding --force, which overwrites files changed by hand, needs its own approval.";
 export const SCOPE_REQUIRED = "Pass --repo <owner/repo> for each repository to cover, or --all-repos to cover "
   + "every repository the owner has.";
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
