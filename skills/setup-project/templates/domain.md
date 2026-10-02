@@ -22,7 +22,7 @@ In a workspace of independent repositories, also read each affected repository's
 
 ## Boundaries
 
-Interfaces between parts that ship, deploy, or version separately, so that different versions of each side can run at the same time. `cross-boundary-contract` applies to any change that alters or depends on one. List `None` for a project that ships as a single unit and stores no data that outlives a release. `Local check` is the way to exercise both sides of the boundary together locally, such as a local run in which one side calls the other, or `None` when the two sides cannot run together.
+Interfaces between parts that ship, deploy, or version separately, so that different versions of each side can run at the same time. `cross-boundary-contract` applies to any change that alters or depends on one. List `None` for a project that ships as a single unit and stores no data that outlives a release. `Local check` says how to run both sides of the boundary together, such as a local run in which one side calls the other, or `None` when they cannot run together.
 
 | Boundary | Producer | Consumers | Versions that can meet | Local check |
 | --- | --- | --- | --- | --- |

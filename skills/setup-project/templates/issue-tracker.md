@@ -2,7 +2,7 @@
 
 GitHub is the source of truth for this project's work items. The workflow skills in `.agents/skills/` read this file for tracker settings instead of hard-coding them. Resolve project, field, item, and option identifiers from GitHub every time; never record them here.
 
-The skill-fleet installer creates this file and fills every tracker setting it can read from GitHub, including the project board it creates or links. The board is required, because the workflow moves every issue across it. When the board changes, or a skill finds it missing or incomplete, ask the user to run `npx skill-fleet@latest update`, which creates or repairs it. The update changes the project board on GitHub, so it runs only with the user's approval, after `npx skill-fleet@latest update --dry-run` shows what it would change.
+The skill-fleet installer creates this file and fills every tracker setting it can read from GitHub, including the project board it creates or links. The board is required, because the workflow moves every issue across it. When the board changes, or a skill finds it missing or incomplete, ask the user to run `npx skill-fleet@latest update`, which creates or repairs it. The update changes the project board on GitHub, so it runs only with the user's approval, after `npx skill-fleet@latest update --dry-run` shows what it would change. The update never rewrites this file; it prints the value for the `Project board` row, and `setup-project` records it here.
 
 `TODO` marks a value nobody has confirmed. `None` means the project deliberately does without it, which the board rows never allow.
 

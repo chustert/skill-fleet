@@ -1,6 +1,6 @@
 ---
 name: setup-project
-description: Adapt the skill fleet to a project by inspecting its repositories, GitHub tracker and board, components, platforms, verification commands, deployments, knowledge documents, boundaries, secret files, and any earlier skills the fleet replaced, then writing the project profile in docs/agents/ that every other skill reads and tailoring the project's AGENTS.md and CLAUDE.md. Use after installing the fleet, when a skill reports a missing or TODO profile value, or when the project's structure, board, or commands change. Reads GitHub but never changes it.
+description: Adapt the skill fleet to a project by inspecting its repositories, GitHub tracker and board, components, platforms, verification commands, deployments, knowledge documents, boundaries, secret files, and the project's earlier skills, including any the fleet replaced, then writing the project profile in docs/agents/ that every other skill reads and tailoring the project's AGENTS.md and CLAUDE.md. Use after installing the fleet, when a skill reports a missing or TODO profile value, or when the project's structure, board, or commands change. Reads GitHub but never changes it.
 ---
 
 # Set up project
@@ -13,8 +13,8 @@ guessing. The profile is three files under `docs/agents/`, described in the
   conventions, and the routing table;
 - `domain.md`: reading order, boundaries and their local checks, ADR location,
   and quality weighting;
-- `verification.md`: per-component commands, evidence, and deployments,
-  services that need approval, protected files, and review-worktree setup.
+- `verification.md`: each component's commands, evidence, and deployments;
+  services that need approval; protected files; and review-worktree setup.
 
 Then tailor the project's instruction files. The fleet installer creates
 `AGENTS.md` from `templates/AGENTS.template.md` when the project has none, and
@@ -61,34 +61,66 @@ because every later skill will trust it.
 ## 2. Harvest the project's earlier skills and docs
 
 A project may arrive with skills, scripts, or agent documents of its own. When
-the installer meets a file it did not write, it reports that the file "exists
-and was not installed by the fleet", and overwrites it only with `--force` or
-the user's consent. The previous version stays in Git. A project can also keep
-its own skills beside the fleet's, such as a skill with a fleet skill's name in
-the folder of a tool that got no adapter. These files often hold the project
-facts the profile needs, so read them before you fill it. Skip this step when
-the installation replaced no project file and no project skill sits beside the
-fleet's.
+the installer would replace content it did not write, it reports a conflict: a
+file that "exists and was not installed by the fleet", a fleet file that
+"changed since the fleet installed it", or an `AGENTS.md` or `CLAUDE.md` whose
+skill-fleet section "was edited by hand". It overwrites them only with
+`--force` or the user's consent. The previous version stays in Git when it was
+committed. A project can also keep its own skills beside the fleet's, such as a
+skill with a fleet skill's name in the folder of a tool that got no adapter.
+These files often hold the project facts the profile needs, so read them before
+you fill it. Skip this step when the installation replaced no project content
+and no project skill sits beside the fleet's.
 
 1. Find the replaced files. Use the conflicts the installer printed when the
-   user still has its output. Otherwise find the commit that added
-   `.agents/skill-fleet.json` with
-   `git log --diff-filter=A --format=%H -- .agents/skill-fleet.json`, and list
-   the files it changed with `git show --stat <commit>`. When the installation
-   is not committed yet, `git status` lists the changed files.
-2. Read each previous version with `git show <commit>^:<path>`. List the
-   project's skills from before the fleet with
-   `git ls-tree -r --name-only <commit>^ -- .agents/skills/`, and the same
-   for each tool's skill folder, such as `.claude/skills/`. Before the
-   installation is committed, use `HEAD` in place of `<commit>^`. Also read
-   the project's own skills that still sit beside the fleet's.
+   user still has its output. Otherwise read them from Git. Every committed
+   install and update changed `.agents/skill-fleet.json`, so
+   `git log --reverse --format=%H -- .agents/skill-fleet.json` lists them,
+   oldest first. List the files each one changed with
+   `git show --name-status --format= <commit>`. Only an `M` entry can have
+   replaced content, and only for `AGENTS.md`, `CLAUDE.md`, or a path the
+   commit's manifest lists under `files`. For each commit after the first,
+   call the one before it in the list `<previous>`, and read its manifest
+   with `git show <previous>:.agents/skill-fleet.json`.
+   - In the first commit, each such file replaced a project file, except
+     `AGENTS.md` and `CLAUDE.md`, which only gained the skill-fleet section.
+   - In a later commit, a file replaced project content when the manifest in
+     `<previous>` does not list it under `files`, such as a project skill
+     that a newer fleet version replaced with a skill of the same name. The
+     same holds when `git diff --name-only <previous> <commit>~1` lists the
+     file, because the project had edited the fleet's version by hand. Any
+     other `M` entry is the fleet updating its own file.
+   - In a later commit, `AGENTS.md` or `CLAUDE.md` lost content only when its
+     skill-fleet section, between the `skill-fleet:begin` and
+     `skill-fleet:end` markers, changed between `<previous>` and
+     `<commit>~1`. The installer keeps the rest of either file.
+
+   When the installation is not committed yet, `git status` lists the changed
+   files. Treat them as one more commit, with `HEAD` in place of
+   `<commit>~1`.
+2. Read each previous version with `git show <commit>~1:<path>`. A file the
+   installer reported that has no previous version in Git was never
+   committed, and the overwrite destroyed it. Ask the user what it held, and
+   report the file as lost when nobody knows. List the project's skills from
+   before the fleet with
+   `git ls-tree -r --name-only <commit>~1 -- .agents/skills/` for the first
+   commit, and the same for each tool's skill folder, such as
+   `.claude/skills/`. Also read the project's own skills that still sit
+   beside the fleet's.
 3. Collect the project facts they hold: commands and their working
    directories, paths, services, safety rules, board and status names, time
    zones, and the steps that gather runtime evidence.
 4. Propose a profile row for each fact, or an `AGENTS.md` line for a rule that
-   applies to every task. When no template row fits, put the fact in the
-   closest profile section and note that no skill reads it yet.
-5. Report every fact in the summary of step 10 as one of:
+   applies to every task. When no template row fits, propose it under the
+   closest profile section, and say in the summary that no template row
+   covers it, so no skill reads it yet.
+5. When a fact differs from a value already in the profile, including one the
+   installer recorded, show both values with their sources and ask the user
+   which is right. Such a fact is not already covered.
+6. A tool that loads a project skill with a fleet skill's name runs the old
+   workflow beside the fleet's. Propose removing or renaming each such skill
+   as a diff for approval.
+7. Report every fact in the summary of step 10 as one of:
    - moved, with the row it went to;
    - already covered, with the file and section that cover it;
    - dropped, with the reason, such as a step of the old workflow that a
@@ -104,8 +136,10 @@ The installer has already made sure the project is a GitHub repository, that
 a project board is linked to the repository with the workflow's `Status`
 options and an iteration field. It recorded the repository, owner type, board,
 lifecycle statuses, iteration field, sprint time zone, and base branch in
-`docs/agents/issue-tracker.md`. Keep those values; fill the rest. Run read-only
-queries and record names, not IDs.
+`docs/agents/issue-tracker.md`. Keep those values unless the user chose a
+different one in step 2; fill the rest. The installer took the sprint time
+zone from the clock of the machine it ran on, so mark it proposed until the
+user confirms it. Run read-only queries and record names, not IDs.
 
 - Check the recorded board against GitHub: `gh project field-list <number>
   --owner <owner> --format json` lists its `Status` options and iteration field.
@@ -176,11 +210,14 @@ lanes, or the engine's command line.
   devices, engine or SDK versions, and licences.
 - Record what a merge or release triggers in the `Deploys` row. Look in the
   deployment documentation, the contracts document, the release workflows in
-  `.github/workflows/`, and hosting configuration, such as a host's
-  configuration file or its auto-deploy setting. A host can deploy every merge
-  with nothing in the repository to show it, so ask the user when these
-  sources do not say. Write `None` only when the user or the sources confirm
-  that nothing deploys.
+  `.github/workflows/`, and hosting configuration committed in the
+  repository, such as a host's configuration file. Many hosts report their
+  deployments to GitHub, so `gh api repos/<owner>/<repo>/deployments` and
+  `gh api repos/<owner>/<repo>/environments` can show where merges go. A host
+  can deploy every merge with nothing in the repository to show it. Ask the
+  user about settings stored on the host, such as automatic deploys, and
+  never query the host. Write `None` only when the user or the sources
+  confirm that nothing deploys.
 - Do not run builds or tests to discover commands. Mark each command
   `(documented, not yet run)` until someone runs it in this checkout.
 
@@ -217,8 +254,8 @@ lanes, or the engine's command line.
   run in which one side calls the other.
 - Find the local check in the contracts document, the component guides, and
   the local stack setup. When they do not describe one, ask the user rather
-  than guess. Write `None` only when you confirm that the two sides cannot run
-  together locally.
+  than guess. Write `None` only when the user or the sources confirm that the
+  two sides cannot run together locally.
 - Propose the `Quality weighting` paragraph from what the product is and the
   starting points in the
   [software quality characteristics](../../references/software-quality-characteristics.md).
@@ -236,8 +273,10 @@ lanes, or the engine's command line.
     `Default repository`;
   - a setting folded into another row, such as statuses listed in the
     `Status field` row instead of a `Lifecycle statuses` row;
-  - a table that lacks a template column, such as a routing table without
-    `Repository` and `Local path`.
+  - a template row or section the file lacks, such as `Deploys` in a
+    component section;
+  - a table that lacks a template column, such as a Boundaries table without
+    `Local check`, or a routing table without `Repository` and `Local path`.
 
   Propose the renames and additions as a diff, and apply it only after the
   user approves. Keep every value the user wrote, and keep sections the
@@ -294,7 +333,9 @@ Present a compact summary:
 - the tracker, board, lifecycle mapping, iteration field, time zone, base
   branch, fallback repository, and cross-component rule;
 - every fact harvested from the project's earlier skills and docs, marked
-  moved, already covered, or dropped with a reason;
+  moved, already covered, or dropped with a reason, and the facts that no
+  template row covers;
+- every replaced file that was lost because nobody committed it;
 - per component: platform, test harness, commands, marking which are
   documented only, and what a merge or release deploys;
 - protected files by name, and the services that need approval;
@@ -305,8 +346,9 @@ Present a compact summary:
 - every remaining `TODO`, in the profile or in `AGENTS.md`, and the question
   that would resolve it;
 - proposed changes that need approval, such as renamed rows and columns in an
-  existing profile file, deny rules, or additions to a hand-written
-  `AGENTS.md`, as diffs awaiting approval.
+  existing profile file, deny rules, additions to a hand-written `AGENTS.md`,
+  or removing a project skill that shares a fleet skill's name, as diffs
+  awaiting approval.
 
 Ask the user to confirm or correct the judgement calls: routing ownership,
 fallback repository, quality weighting, the project intent, and anything
