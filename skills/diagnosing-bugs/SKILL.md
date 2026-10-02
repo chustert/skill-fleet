@@ -20,8 +20,10 @@ instrumentation, remote data changes, or pull requests.
 Read the issue or report, every supplied error and artifact, relevant comments,
 the applicable context and ADRs from the reading order in
 `docs/agents/domain.md`, repository status, recent changes when relevant, and
-the affected component's commands in `docs/agents/verification.md`.
-Distinguish observed facts from user or reviewer hypotheses.
+the affected component's commands in `docs/agents/verification.md`. Handle a
+missing profile file, or a `TODO` or `None` value, as the
+[project profile](../../references/project-profile.md) describes. Distinguish
+observed facts from user or reviewer hypotheses.
 
 If the failure involves a boundary between parts that ship or version
 separately, follow `cross-boundary-contract`. Inspect the relevant producer and
@@ -34,7 +36,9 @@ reports, save files, or captured traffic. Redact credentials, tokens, cookies,
 authorization headers, private keys, and sensitive records as `<REDACTED>`.
 Keep credentials in the environment rather than command text or committed
 fixtures. Do not open or print the protected files listed in
-`docs/agents/verification.md` merely to debug configuration.
+`docs/agents/verification.md`, or any other secret-bearing file, merely to debug
+configuration. When `docs/agents/verification.md` is missing, follow the
+protected-file rules in `AGENTS.md`.
 
 Preserve unrelated working-tree changes. Temporary instrumentation and harnesses
 must be uniquely identifiable and removable; do not hide debugging state in a

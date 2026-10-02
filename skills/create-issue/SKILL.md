@@ -132,7 +132,8 @@ Otherwise use the routing table in `docs/agents/issue-tracker.md`:
 - Route to a component the profile marks as legacy or inactive only when the
   user explicitly targets it.
 - When the owner remains uncertain, use the fallback repository from the
-  tracker settings. Do not guess another repository.
+  tracker settings, and name the components that may be involved in the
+  Description or Additional Context. Do not guess another repository.
 
 Create one issue by default. Follow the profile's rule for work that spans
 components, such as a single issue or an umbrella issue. Do not create
@@ -333,7 +334,7 @@ started status; assignment and that lifecycle transition belong to
 
 ## Verify the created issue
 
-Read the issue and, when configured, its board item back from GitHub. Confirm:
+Read the issue and its board item back from GitHub. Confirm:
 
 - the URL points to the intended repository and issue number;
 - the issue is open and its title and body match the final draft;
@@ -362,10 +363,11 @@ every other GitHub object the reply names, including the parent issue,
 sub-issues, and any issue or pull request cited as grounding. Inside the issue
 body itself, use the plain `#number` or `owner/repo#number` autolink instead.
 
-Also report the repository and owning component, selected form, issue type when
-one applies, labels, board status, parent and
-sub-issue relationship when present, the project sources used to ground added
-factual claims, and any attachment or configuration that could not be applied.
+Also report the repository and owning component, or the components that may be
+involved when the owner is uncertain, selected form, issue type when one
+applies, labels, board status, parent and sub-issue relationship when present,
+the project sources used to ground added factual claims, and any attachment or
+configuration that could not be applied.
 
 Stop after creation and verification. Do not start implementation, create a
 branch, assign anyone, move the issue to the started status, add comments, or

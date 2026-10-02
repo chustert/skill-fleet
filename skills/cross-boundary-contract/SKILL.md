@@ -12,12 +12,15 @@ the edit itself touches only one side.
 
 ## Find the boundary
 
-1. Read the root `AGENTS.md`, the known boundaries and contracts document named
-   in `docs/agents/domain.md`, the routing table in
-   `docs/agents/issue-tracker.md`, and the component guide or `README.md` on
-   each side. In a workspace of independent repositories, read each affected
-   repository's own `AGENTS.md` and any nested instructions for the paths
-   involved.
+1. From the reading order in `docs/agents/domain.md`, read the root
+   `AGENTS.md`, the architecture overview, the contracts document, and the
+   component guide or `README.md` on each side. Also read the `Boundaries`
+   table in `docs/agents/domain.md` and the routing table in
+   `docs/agents/issue-tracker.md`. In a workspace of independent repositories,
+   read each affected repository's own `AGENTS.md` and any nested instructions
+   for the paths involved. Handle a missing profile file, or a `TODO` or `None`
+   value, as the [project profile](../../references/project-profile.md)
+   describes.
 2. If the project records no boundary for the area, find it from the code and
    the platform guides in [platforms](../../references/platforms/README.md).
    Typical boundaries are:
@@ -84,13 +87,15 @@ the edit itself touches only one side.
 
 ## Report
 
-10. In the plan, the handoff, and each pull request, state the contract before
-    and after, the combinations that must keep working, the rollout and
-    rollback order, any migration, backfill, reindex, data conversion,
-    environment variable, or release it needs, the verification on each side
-    and across the boundary, and any external verification still missing. Link
-    the issue and every related issue or pull request wherever you name it, per
-    the [GitHub reference rules](../../references/github-references.md). Inside
+10. In the plan, the handoff, and each pull request, write a change note. When
+    the contracts document defines its own change-note template, fill in that
+    template. Otherwise state the contract before and after, the combinations
+    that must keep working, the rollout and rollback order, any migration,
+    backfill, reindex, data conversion, environment variable, or release it
+    needs, the verification on each side and across the boundary, and any
+    external verification still missing. Link the issue and every related
+    issue or pull request wherever you name it, per the
+    [GitHub reference rules](../../references/github-references.md). Inside
     GitHub text use the plain `#number` or `owner/repo#number` autolink.
 
 Do not commit, push, deploy, release, publish, or apply a remote migration as

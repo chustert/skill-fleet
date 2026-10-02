@@ -18,7 +18,9 @@ dependency installation, remote infrastructure changes, or pull requests.
 
 Read the authoritative issue or request, the applicable context and ADRs from
 `docs/agents/domain.md`, the existing tests, and the affected component's test
-harness and focused-test command in `docs/agents/verification.md`. Reuse the
+harness and focused-test command in `docs/agents/verification.md`. Handle a
+missing profile file, or a `TODO` or `None` value, as the
+[project profile](../../references/project-profile.md) describes. Reuse the
 test seams from an approved specification or `start-issue` handoff when
 available.
 
@@ -49,17 +51,24 @@ in the issue plan without asking again. If no seam exists, propose the smallest
 one and ask only when choosing it would materially alter the public interface,
 architecture, cost, or scope.
 
-## When the component has no test runner
+## When no harness fits the seam
+
+Do not install or replace a test framework as incidental feature work. A
+component can have a test runner and still lack a harness for the seam a
+behaviour needs, such as a unit-test runner with no way to drive the UI or to
+start a local server. Document that gap. Then either use an approved lower seam
+that the existing harness reaches, or return the test-foundation work to issue
+planning.
 
 `docs/agents/verification.md` records `None` as the test harness for a
-component without one. Do not install or replace a test framework as incidental
-feature work. Report the gap, and either use an approved lower seam that does
-have a harness, or use the strongest local evidence the component offers as the
-red and green observations: a request against the local route, a CLI run, a
-scripted play-test step, or a browser or simulator check.
-Record the exact command or steps for both observations. Name the missing
-harness in the handoff so a separate issue can add one. If the behaviour cannot
-be observed locally at all, return the test-foundation work to issue planning.
+component with no test runner at all. Report the gap, and either use an
+approved lower seam that does have a harness, or use the strongest local
+evidence the component offers as the red and green observations: a request
+against the local route, a CLI run, a scripted play-test step, or a browser or
+simulator check. Record the exact command or steps for both observations. Name
+the missing harness in the handoff so a separate issue can add one. If the
+behaviour cannot be observed locally at all, return the test-foundation work to
+issue planning.
 
 ## Write tests worth keeping
 

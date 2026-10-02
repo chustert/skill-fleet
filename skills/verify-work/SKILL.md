@@ -41,7 +41,9 @@ Before running checks:
    `docs/agents/verification.md` and the platform guide it names in
    [platforms](../../references/platforms/README.md). In a workspace of
    independent repositories, also read each affected repository's own
-   `AGENTS.md` and testing documentation.
+   `AGENTS.md` and testing documentation. Handle a missing profile file, or a
+   `TODO` or `None` value, as the
+   [project profile](../../references/project-profile.md) describes.
 4. Convert each acceptance criterion into a concrete observable claim and name
    the strongest locally available evidence for it. Preserve the source wording
    so the final result can be traced back to the issue. Include the criteria
@@ -90,8 +92,8 @@ Assign one result to every criterion:
 - `Pass`: direct evidence demonstrates the specified observable behaviour.
 - `Fail`: direct evidence contradicts the criterion or exposes a blocking error.
 - `Not verified`: required evidence is unavailable, unsafe, ambiguous, or needs
-  credentials, hardware, a human play-test, hosted infrastructure, or
-  authorization not present.
+  credentials, hardware, a human play-test, hosted infrastructure, a paid
+  third-party API, or authorization not present.
 
 Do not use `Pass` for a behavioural or runtime criterion based only on code
 inspection, compilation, a green but unrelated test suite, or an
@@ -149,17 +151,22 @@ Keep these evidence categories separate in the report:
   generic build or an editor measurement.
 - **Credentials and local configuration:** name the missing configuration
   category without opening, printing, or quoting any protected file listed in
-  `docs/agents/verification.md`.
-- **Online, hosted, and paid services:** every service
-  `docs/agents/verification.md` lists as needing approval, plus any preview,
-  staging, production, remote database, store, platform, or third-party API.
+  `docs/agents/verification.md`, or any other secret-bearing file.
+- **Hosted infrastructure:** the deployments and other online targets listed
+  under `Online, hosted, and paid services` in `docs/agents/verification.md`,
+  plus any other preview, staging, or production environment and any remote
+  database.
+- **Paid third-party APIs:** the paid services listed in the same section, plus
+  any other third-party API that costs money, sends real messages, or acts on
+  real accounts, such as a payment sandbox, email delivery, an AI API, or a
+  store or platform service.
 
-Local verification does not authorize contacting an online, hosted, or paid
-service. Explain why local evidence is insufficient, name the target, the
-actions, the expected side effects and cost, and obtain explicit permission for
-that specific check. An unavailable simulator, device, hardware, credential, or
-service produces `Not verified` for the affected claim, reported separately from
-test failures and code defects.
+Local verification does not authorize contacting hosted infrastructure or a
+paid third-party API. Explain why local evidence is insufficient, name the
+target, the actions, the expected side effects and cost, and obtain explicit
+permission for that specific check. An unavailable simulator, device, hardware,
+credential, or service produces `Not verified` for the affected claim, reported
+separately from test failures and code defects.
 
 ## Boundary compatibility
 
@@ -179,7 +186,8 @@ Record:
 - old-producer/new-consumer and new-producer/old-consumer expectations, and old
   stored data read by the new code, such as an earlier save file or an earlier
   client build against the new server;
-- schema, migration, backfill, seed, auth, offline, and rollback implications;
+- schema, migration, backfill, reindexing, seed, environment-variable, auth,
+  offline, and rollback implications;
 - exact contract or integration evidence obtained; and
 - the safe rollout order and rollback order.
 
@@ -245,8 +253,9 @@ Return one self-contained verification record containing:
 3. **Documented commands:** exact commands and results, grouped by component.
 4. **Runtime evidence:** observations and artifact paths for each platform,
    without embedding sensitive data.
-5. **Limitations:** device, hardware, play-test, credential, and online or paid
-   service results or withheld checks, as separate categories.
+5. **Limitations:** device, hardware, play-test, credential, hosted
+   infrastructure, and paid third-party API results or withheld checks, as
+   separate categories.
 6. **Compatibility:** contract evidence plus rollout and rollback order for
    changes that cross a boundary.
 7. **Code review:** the separate Spec and Engineering Standards results from

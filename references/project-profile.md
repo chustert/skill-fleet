@@ -86,6 +86,7 @@ The templates for the three profile files and for a new `AGENTS.md` live in
 5. Never carry a value from one project's profile into another project.
 6. If a profile file a step needs is missing, say so and fall back to the
    repository's own documentation for that step: `AGENTS.md`, `README.md`,
-   `CONTRIBUTING.md`, and CI configuration. Recommend `setup-project`. A step
-   that changes the tracker, such as creating an issue or moving a status,
-   stops instead of guessing its target.
+   `CONTRIBUTING.md`, the documentation index, the testing and development
+   guides, and CI configuration. Recommend `setup-project`. A step that changes
+   the tracker, such as creating an issue or moving a status, stops instead of
+   guessing its target.

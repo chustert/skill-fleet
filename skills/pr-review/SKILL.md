@@ -32,6 +32,10 @@ directory, component, or whole repository. Treat requirements, acceptance
 criteria, architecture decisions, coding standards, and risk priorities supplied
 by the user or repository as authoritative.
 
+Project settings live in `docs/agents/`. Handle a missing profile file, or a
+`TODO` or `None` value, as the
+[project profile](../../references/project-profile.md) describes.
+
 When the user supplies a GitHub pull-request number, URL, or head branch, use the
 pull-request workflow below. The PR patch becomes the review boundary: review
 code added, modified, or deleted by that PR and behavior directly changed by

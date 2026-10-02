@@ -16,9 +16,12 @@ unless the user separately and explicitly authorized that exact action.
 
 ### Establish the exact change
 
-1. Read the applicable repository instructions, the routing table and default
-   base branch in `docs/agents/issue-tracker.md`, and the settings in
-   `docs/agents/verification.md` for each affected component.
+1. Read the documents in the reading order of `docs/agents/domain.md`,
+   including the guide or `README.md` for each affected component. Also read
+   the routing table and default base branch in `docs/agents/issue-tracker.md`,
+   and each affected component's settings in `docs/agents/verification.md`.
+   Handle a missing profile file, or a `TODO` or `None` value, as the
+   [project profile](../../references/project-profile.md) describes.
 2. Identify the repository, remote, current branch, intended base branch, and
    whether the repositories involved have independent Git histories. The base
    is the default base branch from the tracker settings unless the user names
@@ -79,7 +82,9 @@ unless the user separately and explicitly authorized that exact action.
   before creation. Do not block solely on an arbitrary line-count threshold.
 - Check that the implementation matches the issue and that documentation,
   tests, migration notes, compatibility, rollout, and rollback are addressed
-  where relevant.
+  where relevant. Judge the documentation against the guides read in step 1,
+  and flag any guide whose description of behaviour, commands, or setup the
+  diff makes wrong.
 - Run safe, relevant local verification from `docs/agents/verification.md` in
   proportion to risk. Ask before destructive resets, hosted-environment tests,
   deployments, or other external state changes. Never claim an unrun check
