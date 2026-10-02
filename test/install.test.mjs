@@ -691,6 +691,23 @@ describe("GitHub setup", () => {
     assert.doesNotMatch(output, /does not name the board/);
   });
 
+  test("the --board hint for a recorded board that also needs repairs adds --yes", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    const recorded = board(github);
+    github.repo("acme/space-game").linked.clear();
+    recorded.fields = recorded.fields.filter((f) => f.name !== "Sprint");
+    const refused = await run(["update", project], { github });
+    assert.equal(refused.code, 1, refused.output);
+    assert.match(refused.output, /- add a Sprint field with 2-week sprints on "space-game Sprints"\n/);
+    assert.match(refused.output, /or rerun with --board 1 --yes to link that board and make the repairs\.\n/);
+    assert.equal((await run(["update", project, "--board", "1"], { github })).code, 1);
+    const { code, output } = await run(["update", project, "--board", "1", "--yes"], { github });
+    assert.equal(code, 0, output);
+    assert.ok(github.repo("acme/space-game").linked.has(recorded.id));
+    assert.ok(recorded.fields.some((f) => f.name === "Sprint"));
+  });
+
   test("a closed recorded board is named as closed, and never replaced by a board with its title", async () => {
     const github = new FakeGitHub();
     await install(github, {}, "--yes");
