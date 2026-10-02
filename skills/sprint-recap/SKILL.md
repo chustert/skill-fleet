@@ -25,12 +25,13 @@ them to flags:
 | Project board title | `--project "<exact title>"` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Sprint time zone | `--timezone <IANA zone>`, on every run |
-| Each repository in the routing table's `Repository` column | `--repo <owner/repo>`, repeated |
-| Default repository, when the routing table has no `Repository` column | `--repo <owner/repo>`, once |
+| Each distinct repository in the routing table's `Repository` column, skipping rows whose `Component` is still `TODO` | `--repo <owner/repo>`, repeated |
+| Default repository, when the routing table has no `Repository` column or every row's `Component` is still `TODO` | `--repo <owner/repo>`, once |
 
 The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
 `--all-repos` instead of `--repo` only when the user asks for every repository
-of the owner, or the routing table says the board tracks all of them. If a
+of the owner, or the routing table says the board tracks all of them. Never
+pass the template's placeholder `owner/repo`. The script rejects it. If another
 value the command needs is still `TODO`, say so and recommend `setup-project`
 rather than guessing. The board is required: if the settings name none, ask the
 user to run `npx skill-fleet@latest update`, which creates or repairs the

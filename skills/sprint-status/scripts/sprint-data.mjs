@@ -178,12 +178,27 @@ export const REPAIR = "Ask the user to run npx skill-fleet@latest update, which 
   + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with --dry-run.";
 export const SCOPE_REQUIRED = "Pass --repo <owner/repo> for each repository to cover, or --all-repos to cover "
   + "every repository the owner has.";
+const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const PLACEHOLDER = "owner/repo";
 
-/** The repositories a command covers: the listed ones, or all of the owner's with --all-repos. */
+/** The repositories a command covers, each once: the listed ones, or all of the owner's with --all-repos. */
 export function repoScope(repos, allRepos, usage) {
   if (repos.length && allRepos) throw new UsageError(`Pass either --repo or --all-repos, not both.\n\n${usage}`);
   if (!repos.length && !allRepos) throw new UsageError(`${SCOPE_REQUIRED}\n\n${usage}`);
-  return { repos, allRepos };
+  const distinct = new Map();
+  for (const repo of repos) {
+    if (!REPOSITORY.test(repo)) {
+      throw new UsageError(`--repo takes a repository in the form owner/repo, not ${JSON.stringify(repo)}.`
+        + `\n\n${usage}`);
+    }
+    if (repo.toLowerCase() === PLACEHOLDER) {
+      throw new UsageError(`${PLACEHOLDER} is the routing table's template placeholder. Pass the default repository `
+        + "from docs/agents/issue-tracker.md instead.");
+    }
+    // GitHub names are case-insensitive, so acme/App and acme/app are one repository.
+    if (!distinct.has(repo.toLowerCase())) distinct.set(repo.toLowerCase(), repo);
+  }
+  return { repos: [...distinct.values()], allRepos };
 }
 
 export function parseArgs(argv) {

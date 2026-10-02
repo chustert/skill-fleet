@@ -136,6 +136,16 @@ describe("scope", () => {
     assert.deepEqual([all.repos, all.allRepos], [[], true]);
     assert.deepEqual(recap.parseArgs([...window, "--repo", "acme/app"]).repos, ["acme/app"]);
   });
+
+  test("each repository counts once, and a blank, malformed, or placeholder value stops", () => {
+    const window = ["--owner", "acme", "--since", "2026-09-01"];
+    assert.deepEqual(recap.parseArgs([...window, "--repo", "acme/app", "--repo", "ACME/app"]).repos, ["acme/app"]);
+    for (const value of ["", "not a repo", "acme"]) {
+      assert.throws(() => recap.parseArgs([...window, "--repo", value]), (error) => error instanceof sd.UsageError
+        && error.message.startsWith(`--repo takes a repository in the form owner/repo, not ${JSON.stringify(value)}.`));
+    }
+    assert.throws(() => recap.parseArgs([...window, "--repo", "owner/repo"]), /template placeholder/);
+  });
 });
 
 describe("collection", () => {
@@ -189,6 +199,13 @@ describe("collection", () => {
       "Accessible acme repositories, regardless of board membership");
     assert.equal(queries.length, 4);
     for (const query of queries) assert.ok(query.startsWith("org:acme "), query);
+  });
+
+  test("a repository listed twice is searched and named once", () => {
+    assert.equal(run("--repo", "acme/app", "--repo", "acme/app", "--timezone", "UTC").scope,
+      "acme/app, regardless of board membership");
+    assert.equal(queries.length, 4);
+    for (const query of queries) assert.ok(query.startsWith("repo:acme/app is:"), query);
   });
 
   test("the warning goes to stderr before any GitHub call", () => {

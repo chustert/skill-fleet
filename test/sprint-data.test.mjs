@@ -168,6 +168,18 @@ describe("arguments and search scope", () => {
     assert.deepEqual([all.repos, all.allRepos], [[], true]);
   });
 
+  test("each repository counts once, and a blank, malformed, or placeholder value stops", () => {
+    const base = ["--owner", "acme", "--project", "Board"];
+    assert.deepEqual(sd.parseArgs([...base, "--repo", "acme/app", "--repo", "acme/api", "--repo", "Acme/App"]).repos,
+      ["acme/app", "acme/api"]);
+    for (const value of ["", "not a repo", "acme", "acme/app/web", "`acme/app`"]) {
+      assert.throws(() => sd.parseArgs([...base, "--repo", "acme/app", "--repo", value]), (error) =>
+        error instanceof sd.UsageError
+          && error.message.startsWith(`--repo takes a repository in the form owner/repo, not ${JSON.stringify(value)}.`));
+    }
+    assert.throws(() => sd.parseArgs([...base, "--repo", "owner/repo"]), /owner\/repo is the routing table's template/);
+  });
+
   test("the command line stops with a usage error when no scope is given", () => {
     const script = fileURLToPath(new URL("../skills/sprint-status/scripts/sprint-data.mjs", import.meta.url));
     const res = spawnSync(process.execPath, [script, "--owner", "acme", "--project", "Board"], { encoding: "utf8" });
@@ -241,6 +253,15 @@ describe("collection", () => {
     for (const args of searches(calls)) {
       assert.ok(args.includes("--repo=acme/app") && args.includes("--repo=acme/api"), args.join(" "));
       assert.ok(!args.some((arg) => arg.startsWith("--owner=")), args.join(" "));
+    }
+  });
+
+  test("a repository listed twice is searched once", () => {
+    const calls = fakeGh(board);
+    run("--repo", "acme/app", "--repo", "acme/app");
+    assert.equal(searches(calls).length, 3);
+    for (const args of searches(calls)) {
+      assert.deepEqual(args.filter((arg) => arg.startsWith("--repo=")), ["--repo=acme/app"], args.join(" "));
     }
   });
 
