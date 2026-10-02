@@ -712,7 +712,16 @@ describe("GitHub setup", () => {
     const refused = await install(github, {}, "--yes");
     assert.equal(refused.code, 1);
     assert.match(refused.output, /acme already has an open project board titled "space-game Sprints", #1, that is not linked/);
-    assert.match(refused.output, /To use that board, rerun with --board 1\.\n/);
+    assert.match(refused.output, /which find the board by its title\. Nothing was written\. To use that board, rerun with --board 1\.\n/);
+    assert.equal(github.mutations().length, 0);
+    assert.equal(exists(project, ".agents"), false);
+    // The dry run an agent shows the user names the same stop, still lists the files, and fails.
+    const preview = await install(github, {}, "--dry-run", "--yes");
+    assert.equal(preview.code, 1, preview.output);
+    assert.match(preview.output, /! The run would stop at the project board: acme already has an open project board titled "space-game Sprints", #1, that is not linked to acme\/space-game\. .* To use that board, rerun with --board 1\.\n/);
+    assert.match(preview.output, /would create \.agents\/skills\/tdd\/SKILL\.md\n/);
+    assert.doesNotMatch(preview.output, /would create the project board/);
+    assert.match(preview.output, /Nothing was written, on GitHub or on disk\.\nThe run would stop at the project board, as described above\.\n$/);
     assert.equal(github.mutations().length, 0);
     assert.equal(exists(project, ".agents"), false);
     let choices;
