@@ -19,6 +19,7 @@ export class FakeGitHub {
     this.runs = [];
     this.nextId = 1;
     this.clock = 0;
+    this.boardCount = 0;
     this.gh = this.gh.bind(this);
   }
 
@@ -33,11 +34,12 @@ export class FakeGitHub {
     return this.repos.get(nameWithOwner);
   }
 
-  /** Add a board to the owner, optionally linked to a repository. */
+  /** Add a board to the owner, optionally linked to a repository. Like GitHub, it never reuses a board number. */
   addBoard({ title, linkedTo = null, statuses = ["Todo", "In Progress", "Done"], iteration = null, closed = false }) {
+    const number = ++this.boardCount;
     const board = {
-      id: this.id("PVT"), number: this.boards.length + 1, title, closed, updated: this.clock++,
-      url: `https://github.com/users/acme/projects/${this.boards.length + 1}`,
+      id: this.id("PVT"), number, title, closed, updated: this.clock++,
+      url: `https://github.com/users/acme/projects/${number}`,
       fields: [
         { id: this.id("F"), name: "Title", dataType: "TITLE" },
         { id: this.id("F"), name: "Status", dataType: "SINGLE_SELECT",
@@ -53,6 +55,12 @@ export class FakeGitHub {
 
   board(id) {
     return this.boards.find((b) => b.id === id);
+  }
+
+  /** Delete a board, as its owner can on GitHub. */
+  deleteBoard(id) {
+    this.boards = this.boards.filter((b) => b.id !== id);
+    for (const repo of this.repos.values()) repo.linked.delete(id);
   }
 
   /** Mark a board as just updated, as a change to its fields or links does on GitHub. */

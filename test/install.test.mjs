@@ -691,6 +691,66 @@ describe("GitHub setup", () => {
     assert.doesNotMatch(output, /does not name the board/);
   });
 
+  test("a closed recorded board is named as closed, and never replaced by a board with its title", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    const recorded = board(github);
+    // Closed, but still linked to the repository.
+    recorded.closed = true;
+    const update = (...argv) => run(["update", project, ...argv], { github });
+    const refused = await update("--yes");
+    assert.equal(refused.code, 1, refused.output);
+    assert.match(refused.output, /The board recorded at the last installation, #1 "space-game Sprints", is closed\. To use it again, reopen it on GitHub and rerun skill-fleet\.\n/);
+    assert.doesNotMatch(refused.output, /no longer linked/);
+    assert.match(refused.output, /skill-fleet does not replace it with a new board\. Nothing was written\. Reopen it on GitHub and rerun skill-fleet, or name another board with --board <number or title>\.\n/);
+    const preview = await update("--dry-run", "--yes");
+    assert.equal(preview.code, 1, preview.output);
+    assert.match(preview.output, /The run would stop at the project board: The board recorded at the last installation, #1 "space-game Sprints", is closed/);
+    assert.doesNotMatch(preview.output, /would create the project board/);
+    // In a terminal, another board can be chosen, but no choice creates one.
+    const roadmap = github.addBoard({ title: "Roadmap", statuses: ["Todo", "In progress", "In review", "Done"],
+      iteration: "Sprint" });
+    let choices;
+    const chosen = await run(["update", project], { github, interactive: true,
+      answers: { board: (offered) => { choices = offered; return offered[0].value; } } });
+    assert.equal(chosen.code, 0, chosen.output);
+    assert.deepEqual(choices.map((c) => c.label), ["Roadmap"]);
+    assert.ok(github.repo("acme/space-game").linked.has(roadmap.id));
+    const named = await install(github, {}, "--board", "1");
+    assert.equal(named.code, 1, named.output);
+    assert.match(named.output, /acme's project board #1 "space-game Sprints" is closed\. Reopen it on GitHub, then rerun with --board 1\./);
+    assert.equal(github.boards.filter((b) => b.title === "space-game Sprints").length, 1);
+  });
+
+  test("a deleted recorded board is named as gone, and --yes creates a new one", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    github.deleteBoard(board(github).id);
+    const { code, output } = await run(["update", project, "--yes"], { github });
+    assert.equal(code, 0, output);
+    assert.match(output, /The board recorded at the last installation, #1, is no longer on GitHub, or this account cannot see it\.\n/);
+    assert.match(output, /Created the project board "space-game Sprints"/);
+    assert.deepEqual(github.boards.map((b) => b.number), [2]);
+    assert.equal(JSON.parse(read(project, checks.MANIFEST)).github.board.number, 2);
+  });
+
+  test("the recorded board is linked again next to another board with the workflow's title, with a warning", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    const recorded = board(github);
+    github.repo("acme/space-game").linked.clear();
+    const twin = github.addBoard({ title: "space-game Sprints" });
+    const preview = await run(["update", project, "--dry-run", "--yes"], { github });
+    assert.equal(preview.code, 0, preview.output);
+    assert.match(preview.output, /would link the project board "space-game Sprints" to acme\/space-game/);
+    const { code, output } = await run(["update", project, "--yes"], { github });
+    assert.equal(code, 0, output);
+    assert.ok(github.repo("acme/space-game").linked.has(recorded.id));
+    assert.equal(github.repo("acme/space-game").linked.has(twin.id), false);
+    assert.equal(github.boards.length, 2);
+    assert.match(output, /acme has another open project board titled "space-game Sprints", #2\. The sprint skills find the board by its title, so they stop while two open boards have it\. Rename or close #2 on GitHub\.\n/);
+  });
+
   test("in a terminal, the recorded board is the first choice", async () => {
     const github = new FakeGitHub();
     await install(github, {}, "--yes");

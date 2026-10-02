@@ -56,7 +56,7 @@ Commit the project before you install or update. A file the fleet overwrites kee
 
 When several boards could serve the repository, it also asks which one to use, and it asks before it creates, links, or repairs the board. `--yes` skips every question. It keeps the choices recorded by the last installation, or uses Claude Code, Cursor, and the instruction files the first time, and it makes the board changes the workflow needs.
 
-Without a terminal, such as in CI, the installer asks nothing and keeps the recorded choices, but it changes the board only with `--yes`, or, for a link, with the board named by `--board`. A run that would change the board without that consent lists the planned board changes, writes nothing on GitHub or on disk, and exits with an error. Rerun it in a terminal or with `--yes`. When no board is linked, `--yes` links the board the last installation recorded again, if the owner still has it open. Otherwise it creates a new board, unless an open board of the owner already has that title, which would leave two boards the sprint skills cannot tell apart. Then it stops and asks you to name that board with `--board`. To use any other existing board, name it with `--board`.
+Without a terminal, such as in CI, the installer asks nothing and keeps the recorded choices, but it changes the board only with `--yes`, or, for a link, with the board named by `--board`. A run that would change the board without that consent lists the planned board changes, writes nothing on GitHub or on disk, and exits with an error. Rerun it in a terminal or with `--yes`. When no board is linked, `--yes` links the board the last installation recorded again, if the owner still has it open. If that board is closed, the run stops and asks you to reopen it on GitHub or to name another board with `--board`, because skill-fleet never creates a board in place of a closed one. Otherwise `--yes` creates the board `<repository> Sprints`, unless an open board of the owner already has the title `<repository> Sprints`. The sprint skills find the board by its title and cannot tell two such boards apart, so the run stops instead and asks you to name the existing board with `--board`. To use any other existing board, name it with `--board`. A dry run that meets either stop says why, still lists the file changes, and exits with an error.
 
 Flags answer a single question instead:
 
@@ -66,7 +66,7 @@ Flags answer a single question instead:
 | `--instructions`, `--no-instructions` | Create and update `AGENTS.md` and `CLAUDE.md`, or leave both alone |
 | `--force` | Overwrite conflicting files without asking, and run over an installation made by a newer version |
 | `--board <number or title>` | Use this board of the repository's owner, linking it to the repository. Naming the board approves the link, also without a terminal |
-| `--dry-run` | Show what would change, on GitHub and on disk, and change nothing. Conflicting files are listed with the rest, and the dry run fails when they would stop the real run |
+| `--dry-run` | Show what would change, on GitHub and on disk, and change nothing. Conflicting files and a stop at the board are listed with the rest, and the dry run fails when either would stop the real run |
 
 The installer writes:
 
