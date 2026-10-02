@@ -16,12 +16,13 @@ Read the tracker settings and the routing table in
 `docs/agents/issue-tracker.md`, following the
 [rules for reading the profile](../../references/project-profile.md), and map
 them to flags. The board is required: if the settings name none, say so and ask
-the user to run `npx skill-fleet@latest update --dry-run`, and then
-`npx skill-fleet@latest update` once they approve the changes it lists. The
-update creates or repairs the project board on GitHub. Do not run either
-command yourself unless the user approves it. If another value the command
-needs is still `TODO`, say so and recommend `setup-project` rather than
-guessing.
+the user to run `npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+If another value the command needs is still `TODO`, say so and recommend
+`setup-project` rather than guessing.
 
 | Tracker setting | Flag |
 | --- | --- |
@@ -68,11 +69,12 @@ If it exits asking for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project` — do not try to work around it. If it reports
 that it found no board with that title, or several, or that the board has no
 iteration field, say so and point at the tracker settings. Ask the user to run
-`npx skill-fleet@latest update --dry-run`, and then
-`npx skill-fleet@latest update` once they approve the changes it lists. The
-update creates or repairs the project board on GitHub. Do not run either
-command yourself unless the user approves it. Do not substitute another
-project.
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+Do not substitute another project.
 
 Read the JSON before writing anything. The fields that matter:
 

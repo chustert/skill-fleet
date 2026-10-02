@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 import * as checks from "../lib/check-skills.mjs";
-import { ROOT, skillNames } from "../lib/install.mjs";
+import { agentsBlock, ROOT, skillNames } from "../lib/install.mjs";
+import { REPAIR } from "../skills/sprint-status/scripts/sprint-data.mjs";
 
 const SKILLS = skillNames();
 const PLATFORMS = ["web", "mobile", "desktop", "game", "service", "library-cli"];
@@ -20,6 +21,34 @@ function shippedFiles() {
     checks.listFiles(path.join(ROOT, base))
       .filter((file) => /\.(md|mjs|yaml)$/.test(file))
       .map((file) => `${base}/${file}`));
+}
+
+// The update rule, as "Updating the installation" in the profile reference states it. Every mention of the
+// update repeats the user's run and the approval rule, and states or links the agent's steps.
+const USER_RUN = "`npx skill-fleet@latest update --dry-run` and then `npx skill-fleet@latest update` in their own terminal";
+const APPROVAL = "without the user's approval";
+const AGENT_STEPS = ["`npx skill-fleet@latest update --dry-run --yes`", "approves that exact plan",
+  "`npx skill-fleet@latest update --yes`", "same flags", "`--force`", "needs its own approval"];
+const UPDATE_LINK = /\(\.\.\/\.\.\/references\/project-profile\.md#updating-the-installation\)|"Updating the installation" in `\.agents\/references\/project-profile\.md`/;
+
+/** The paragraphs and list items of Markdown text, each on one line. */
+function paragraphs(text) {
+  return text.split(/\n\s*\n|\n(?=\s*(?:\d+\.|-) )/).map((block) => block.replace(/\s+/g, " ").trim());
+}
+
+/** What a paragraph that mentions the update lacks of the update rule. */
+function updateRuleGaps(paragraph, { code = true } = {}) {
+  const plain = (phrase) => (code ? phrase : phrase.replaceAll("`", ""));
+  // The bare command, without --dry-run or --yes, comes only as the second half of the user's run.
+  const bare = (code ? /`npx skill-fleet@latest update`/g : /npx skill-fleet@latest update(?! --)/g);
+  const gaps = [];
+  if (paragraph.split(plain(USER_RUN)).length - 1 !== (paragraph.match(bare) ?? []).length) {
+    gaps.push("the user's run with its dry run first");
+  }
+  if (!paragraph.includes(APPROVAL)) gaps.push("the approval rule");
+  const steps = AGENT_STEPS.every((step) => paragraph.includes(plain(step)));
+  if (!steps && !UPDATE_LINK.test(paragraph)) gaps.push("the agent's steps or a link to them");
+  return gaps;
 }
 
 function matchingLines(pattern) {
@@ -101,15 +130,25 @@ describe("content", () => {
     }
   });
 
-  test("every request for the update names the dry run first and the approval rule", () => {
-    const request = "`npx skill-fleet@latest update --dry-run`, and then `npx skill-fleet@latest update` once";
+  test("every mention of the update states the user's run, the approval rule, and the agent's steps", () => {
+    const profile = fs.readFileSync(path.join(ROOT, "references/project-profile.md"), "utf8");
+    assert.match(profile, /^## Updating the installation$/m);
+    const mentions = [];
     for (const file of shippedFiles().filter((name) => name.endsWith(".md"))) {
-      const text = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\s+/g, " ");
-      const mentions = text.split("`npx skill-fleet@latest update`").length - 1;
-      if (!mentions) continue;
-      assert.equal(text.split(request).length - 1, mentions, `${file} asks for the update without its dry run`);
-      assert.ok(text.includes("unless the user approves it"), `${file} states who may run the update`);
+      for (const paragraph of paragraphs(fs.readFileSync(path.join(ROOT, file), "utf8"))) {
+        if (paragraph.includes("skill-fleet@latest update")) mentions.push({ where: file, paragraph });
+      }
     }
+    for (const paragraph of paragraphs(agentsBlock(["claude"]))) {
+      if (paragraph.includes("skill-fleet@latest update")) mentions.push({ where: "agentsBlock()", paragraph });
+    }
+    assert.ok(mentions.length >= 12, `found ${mentions.length} mentions`);
+    for (const { where, paragraph } of mentions) {
+      assert.deepEqual(updateRuleGaps(paragraph), [], `${where}: ${paragraph}`);
+    }
+    assert.deepEqual(updateRuleGaps(REPAIR, { code: false }), [], REPAIR);
+    assert.ok(mentions.some(({ where, paragraph }) => where === "references/project-profile.md"
+      && AGENT_STEPS.every((step) => paragraph.includes(step))), "the profile reference states the agent's steps");
   });
 
   test("the fleet and every borrowed skill carry an MIT licence", () => {

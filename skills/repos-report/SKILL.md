@@ -30,10 +30,12 @@ them to flags:
 | Sprint time zone | `--timezone <IANA zone>`, on every run |
 
 The board is required: if the settings name none, say so and ask the user to
-run `npx skill-fleet@latest update --dry-run`, and then
-`npx skill-fleet@latest update` once they approve the changes it lists. The
-update creates or repairs the project board on GitHub. Do not run either
-command yourself unless the user approves it. If another value the command needs is still `TODO`, say so and recommend
+run `npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+If another value the command needs is still `TODO`, say so and recommend
 `setup-project` rather than guessing. When the routing table has no local paths
 yet, omit `--path`. The script then reports on the project root's repository
 alone, and the report says that other clones may be missing.
@@ -80,11 +82,12 @@ date can differ from the team's and pick the wrong sprint.
 When `sprint.error` asks for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project`. When it says the board is missing, is
 ambiguous, or has no iteration field, ask the user to run
-`npx skill-fleet@latest update --dry-run`, and then
-`npx skill-fleet@latest update` once they approve the changes it lists. The
-update creates or repairs the project board on GitHub. Do not run either
-command yourself unless the user approves it. Either way, write the report
-without the issue map and say why it is missing.
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+Either way, write the report without the issue map and say why it is missing.
 
 ## 2. Read the JSON
 

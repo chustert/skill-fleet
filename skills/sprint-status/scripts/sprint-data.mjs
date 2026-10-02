@@ -214,11 +214,14 @@ The project is the board named in docs/agents/issue-tracker.md. Pass --repo for
 each repository in its routing table. --all-repos covers every repository the
 owner has instead. Pass that file's sprint time zone as --timezone. Without it
 or --date, today's date comes from this machine's clock and the script warns.`;
-export const REPAIR = "Ask the user to run npx skill-fleet@latest update --dry-run, and then "
-  + "npx skill-fleet@latest update once they approve the changes it lists. The update creates or repairs the "
-  + "project board on GitHub. Do not run either command yourself unless the user approves it. If the user asks "
-  + "you to run the update yourself, add --yes: without a terminal, the update changes the board only with it. "
-  + "Adding --force, which overwrites files changed by hand, needs its own approval.";
+// The update rule, worded as .agents/references/project-profile.md words it in "Updating the installation".
+export const REPAIR = "Ask the user to run npx skill-fleet@latest update --dry-run and then "
+  + "npx skill-fleet@latest update in their own terminal. The update creates or repairs the project board on "
+  + "GitHub. Do not run it yourself without the user's approval. If the user asks you to run it, run "
+  + "npx skill-fleet@latest update --dry-run --yes and show the user the plan it prints. Run "
+  + "npx skill-fleet@latest update --yes only after the user approves that exact plan, with the same flags, such "
+  + "as --board or --tools for a choice the user made. Adding --force, which overwrites files changed by hand, "
+  + "needs its own approval.";
 export const SCOPE_REQUIRED = "Pass --repo <owner/repo> for each repository to cover, or --all-repos to cover "
   + "every repository the owner has.";
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;

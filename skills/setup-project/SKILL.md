@@ -159,10 +159,12 @@ user confirms it. Run read-only queries and record names, not IDs.
   --owner <owner> --format json` lists its `Status` options and iteration field.
   If the board is missing, unlinked, or lacks an option or the iteration field,
   do not repair it here. Ask the user to run
-  `npx skill-fleet@latest update --dry-run`, and then
-  `npx skill-fleet@latest update` once they approve the changes it lists. The
-  update creates or repairs the project board on GitHub. Do not run either
-  command yourself unless the user approves it. Continue with the rest.
+  `npx skill-fleet@latest update --dry-run` and then
+  `npx skill-fleet@latest update` in their own terminal. The update creates or
+  repairs the project board on GitHub. Do not run it yourself without the
+  user's approval. When the user asks you to run it, follow [Updating the
+  installation](../../references/project-profile.md#updating-the-installation).
+  Continue with the rest.
 - If `docs/agents/issue-tracker.md` predates the installer and names no board,
   take the board the installer set up from `github.board` in
   `.agents/skill-fleet.json`: its `owner`, `number`, `title`, and `url`. The

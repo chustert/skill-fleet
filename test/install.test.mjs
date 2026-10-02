@@ -343,16 +343,14 @@ describe("AGENTS.md and CLAUDE.md", () => {
     assert.ok(agents.includes("[`acme/space-game`](https://github.com/acme/space-game)"));
     const block = checks.findBlock(agents);
     assert.match(block, /## Agent workflow/);
-    const request = "ask the user to run `npx skill-fleet@latest update --dry-run`, and then "
-      + "`npx skill-fleet@latest update` once they approve the changes it lists.";
-    const approval = "Do not run either command yourself unless the user approves it.";
-    assert.ok(block.includes(`When it is missing or incomplete, ${request} The update creates or repairs the project `
-      + `board on GitHub. ${approval}`), block);
+    assert.ok(block.includes("When the board is missing or incomplete, or the fleet's files need an update, ask the "
+      + "user to run `npx skill-fleet@latest update --dry-run` and then `npx skill-fleet@latest update` in their own "
+      + "terminal. Do not run it yourself without the user's approval. If the user asks you to run it, run "
+      + "`npx skill-fleet@latest update --dry-run --yes` and show the user the plan it prints. Run "
+      + "`npx skill-fleet@latest update --yes` only after the user approves that exact plan, with the same flags"), block);
+    assert.match(block, /Adding `--force`, which overwrites files changed by hand, needs its own approval\./);
     assert.match(block, /Do not edit by hand the files that `\.agents\/skill-fleet\.json` records/);
     assert.match(block, /Put a project's own skill in its own folder under `\.agents\/skills\/`, and add nothing inside a fleet skill's folder or `\.agents\/references\/`\./);
-    assert.ok(block.includes(`To update the fleet's files, ${request} The update can also change the project board on `
-      + `GitHub. ${approval} If the user asks you to run the update yourself, add \`--yes\``), block);
-    assert.match(block, /Adding `--force`, which overwrites files changed by hand, needs its own approval\./);
     assert.match(output, /fill the TODOs in AGENTS\.md/);
     assert.equal(checks.findBlock(read(project, "CLAUDE.md")), "@AGENTS.md\n");
     assert.deepEqual(checks.check(project), []);

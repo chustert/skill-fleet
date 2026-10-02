@@ -23,14 +23,27 @@ has all of the following, and the installer (`npx skill-fleet`) sets them up:
   `In progress`, `prepare-pr` to `In review`. GitHub's built-in project
   workflow moves closed issues to `Done`.
 
-When the board is missing or incomplete, a skill stops and asks the user to
-run `npx skill-fleet@latest update --dry-run`, and then
-`npx skill-fleet@latest update` once they approve the changes it lists. The
-update creates or repairs the project board on GitHub. An agent runs neither
-command, nor `install`, unless the user approves it. If the user asks the agent
-to run the update, the agent adds `--yes`: without a terminal, the update
-changes the board only with it. Adding `--force`, which overwrites files
-changed by hand, needs its own approval.
+## Updating the installation
+
+When a skill finds the board missing or incomplete, it asks the user to run
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub and updates the fleet's files, so an agent
+never runs it, or `install`, without the user's approval. If the user asks the
+agent to run the update, the agent runs
+`npx skill-fleet@latest update --dry-run --yes` and shows the user the plan it
+prints. If that dry run fails, the agent shows the user why and stops. Only
+after the user approves that exact plan does the agent run
+`npx skill-fleet@latest update --yes`, with the same flags as the dry run. When
+the user makes a choice, such as the board to use or the tools that get
+adapters, the agent passes it to both runs as a flag, such as
+`--board <number>` or `--tools claude,cursor`. Adding `--force`, which
+overwrites files changed by hand, needs its own approval.
+
+Both of the agent's runs take `--yes`, so the dry run plans what the real run
+does. In a terminal the update asks questions, such as which board to link, and
+without one it answers them itself. A dry run in the user's terminal can
+therefore plan a different board than the agent's run would use.
 
 ## Where things live
 
@@ -79,10 +92,8 @@ The templates for the three profile files and for a new `AGENTS.md` live in
 3. `None` is a real value. The project deliberately has no glossary, no
    contracts document, or no test harness. Skip the step that depends on it and
    report it as not configured, not as a failure. The board rows never allow
-   `None`: without a board, stop and ask the user to run
-   `npx skill-fleet@latest update --dry-run`, and then
-   `npx skill-fleet@latest update` once they approve the changes it lists. Do
-   not run either command yourself unless the user approves it.
+   `None`. Without a board, stop and ask the user to update the installation,
+   as [Updating the installation](#updating-the-installation) describes.
 4. When the profile and the live system disagree, such as a renamed board or a
    removed command, trust the live evidence, report the disagreement, and
    propose the profile correction. Do not edit the profile silently from
