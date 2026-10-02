@@ -6,7 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import * as checks from "../lib/check-skills.mjs";
 import { main, parseArgs, UsageError } from "../lib/cli.mjs";
-import { ROOT, skillNames } from "../lib/install.mjs";
+import { compareVersions, markdownTables, missingSettings, ROOT, skillNames, version } from "../lib/install.mjs";
 import { FakeGitHub } from "./fake-github.mjs";
 
 const SKILLS = skillNames();
@@ -29,6 +29,7 @@ async function run(argv, { cwd, interactive = false, answers = {}, github = new 
       if (message.includes("Log in")) return answers.login ?? initial;
       if (message.includes("scope")) return answers.refresh ?? initial;
       if (message.includes("needs changes")) return answers.repair ?? initial;
+      if (message.includes("Create the project board")) return answers.create ?? initial;
       return initial;
     },
     select: async ({ message, choices }) => {
@@ -53,15 +54,29 @@ function tempProject(name = "project", remote = `https://github.com/acme/${name}
   return { dir, project };
 }
 
+/** A fake GitHub whose repository already has a linked board the workflow can use as it is. */
+function readyGitHub(nameWithOwner = "acme/project") {
+  const github = new FakeGitHub();
+  github.addBoard({ title: "Sprints", linkedTo: nameWithOwner, statuses: ["Todo", "In progress", "In review", "Done"],
+    iteration: "Sprint" });
+  return github;
+}
+
 const read = (project, relative) => fs.readFileSync(path.join(project, relative), "utf8");
 const exists = (project, relative) => fs.existsSync(path.join(project, relative));
+const write = (project, relative, text) => {
+  fs.mkdirSync(path.dirname(path.join(project, relative)), { recursive: true });
+  fs.writeFileSync(path.join(project, relative), text);
+};
+const template = (name) => fs.readFileSync(path.join(ROOT, "skills/setup-project/templates", name), "utf8");
 
 describe("install", () => {
   let dir;
   let project;
   beforeEach(() => ({ dir, project } = tempProject()));
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const install = (...argv) => run(["install", project, ...argv]);
+  // Each run gets a new fake GitHub, so --yes lets it create the board again.
+  const install = (...argv) => run(["install", project, "--yes", ...argv]);
 
   test("writes skills, references, adapters, the checker, and the manifest", async () => {
     const { code, output } = await install();
@@ -101,6 +116,7 @@ describe("install", () => {
     const { code, output } = await install();
     assert.equal(code, 0, output);
     assert.match(output, /: \d+ unchanged\./);
+    assert.doesNotMatch(output, /does not manage/);
   });
 
   test("adapters copy only the fields each tool reads", async () => {
@@ -125,6 +141,7 @@ describe("install", () => {
     const forced = await install("--force");
     assert.equal(forced.code, 0);
     assert.doesNotMatch(fs.readFileSync(edited, "utf8"), /Local edit\./);
+    assert.doesNotMatch(forced.output, /had not installed/);
   });
 
   test("never overwrites skills from another workflow", async () => {
@@ -139,6 +156,16 @@ describe("install", () => {
     assert.equal(exists(project, ".agents/skills/tdd"), false);
   });
 
+  test("--force names the files it replaced that the fleet had not installed", async () => {
+    write(project, ".agents/skills/start-issue/SKILL.md",
+      "---\nname: start-issue\ndescription: A project's own version.\n---\n\nBody.\n");
+    const { code, output } = await install("--force");
+    assert.equal(code, 0, output);
+    assert.match(output, /replaced these files, which the fleet had not installed:\n {2}\.agents\/skills\/start-issue\/SKILL\.md\n/);
+    assert.match(output, /previous versions remain in Git/);
+    assert.match(output, /setup-project next\. It reads them to carry any project facts into docs\/agents\//);
+  });
+
   test("dropping a tool removes its adapters", async () => {
     await install("--claude", "--kiro");
     assert.ok(exists(project, ".kiro/skills/tdd/SKILL.md"));
@@ -151,9 +178,69 @@ describe("install", () => {
 
   test("an update keeps the installed tools", async () => {
     await install("--cursor");
-    await run(["update", project]);
+    await run(["update", project, "--yes"]);
     assert.equal(exists(project, ".claude"), false);
     assert.ok(exists(project, ".cursor/skills/tdd/SKILL.md"));
+  });
+
+  test("an update notes paths in .agents/skills/ that the fleet does not manage", async () => {
+    await install();
+    write(project, ".agents/skills/sprint-status/scripts/old-collector.mjs", "// left over\n");
+    write(project, ".agents/skills/house-notes/notes.md", "Notes.\n");
+    const { code, output } = await run(["update", project, "--yes"]);
+    assert.equal(code, 0, output);
+    assert.match(output, /the fleet does not manage these paths in \.agents\/skills\/:\n {2}\.agents\/skills\/house-notes\/\n {2}\.agents\/skills\/sprint-status\/scripts\/old-collector\.mjs\n/);
+    assert.match(output, /left over from an earlier copy of the fleet\. A project's own skill can stay\./);
+    assert.ok(exists(project, ".agents/skills/sprint-status/scripts/old-collector.mjs"));
+  });
+
+  test("refuses to run over an installation by a newer version, unless forced", async () => {
+    await install();
+    const [major, minor] = version().split(".").map(Number);
+    // Newer by number. While the minor version is below 10, it sorts first as a string, as 1.14.0 does before 1.4.0.
+    const newer = `${major}.${minor + 10}.0`;
+    const manifest = JSON.parse(read(project, checks.MANIFEST));
+    fs.writeFileSync(path.join(project, checks.MANIFEST), JSON.stringify({ ...manifest, version: newer }));
+    const recorded = read(project, checks.MANIFEST);
+    for (const command of ["install", "update"]) {
+      const github = new FakeGitHub();
+      const { code, output } = await run([command, project, "--yes"], { github });
+      assert.equal(code, 1, output);
+      assert.ok(output.includes(`installed with skill-fleet ${newer}, which is newer than this skill-fleet ${version()}`));
+      assert.ok(output.includes(`Run npx skill-fleet@${newer} ${command}, or npx skill-fleet@latest ${command} once ${newer} is published`));
+      assert.deepEqual(github.calls, []);
+    }
+    assert.equal(read(project, checks.MANIFEST), recorded);
+    const forced = await install("--force");
+    assert.equal(forced.code, 0, forced.output);
+    assert.equal(JSON.parse(read(project, checks.MANIFEST)).version, version());
+  });
+
+  test("an installation by an older version updates", async () => {
+    await install();
+    const manifest = JSON.parse(read(project, checks.MANIFEST));
+    fs.writeFileSync(path.join(project, checks.MANIFEST), JSON.stringify({ ...manifest, version: "0.9.0" }));
+    const { code, output } = await install();
+    assert.equal(code, 0, output);
+    assert.equal(JSON.parse(read(project, checks.MANIFEST)).version, version());
+  });
+
+  test("next steps name the profile settings the templates have and the project lacks", async () => {
+    const [settings] = markdownTables(template("verification.md")).filter((t) => t.header[0] === "Setting");
+    const setting = settings.rows[1][0];
+    write(project, "docs/agents/verification.md", template("verification.md").replaceAll("TODO", "Filled")
+      .split("\n").filter((line) => !line.startsWith(`| ${setting} |`)).join("\n"));
+    const boundaries = markdownTables(template("domain.md")).find((t) => t.section === "Boundaries");
+    const column = boundaries.header.at(-1);
+    write(project, "docs/agents/domain.md", template("domain.md").replaceAll("TODO", "Filled").split("\n")
+      .map((line) => (line.startsWith(`| ${boundaries.header[0]} |`) ? `| ${boundaries.header.slice(0, -1).join(" | ")} |` : line))
+      .join("\n"));
+    write(project, "docs/agents/issue-tracker.md", template("issue-tracker.md").replaceAll("TODO", "Filled"));
+    const { code, output } = await install();
+    assert.equal(code, 0, output);
+    assert.ok(output.includes(`  - add the settings missing from docs/agents/verification.md: ${setting}\n`), output);
+    assert.ok(output.includes(`  - add the settings missing from docs/agents/domain.md: ${column}\n`), output);
+    assert.doesNotMatch(output, /missing from docs\/agents\/issue-tracker\.md/);
   });
 
   test("update stops when nothing is installed", async () => {
@@ -208,7 +295,7 @@ describe("AGENTS.md and CLAUDE.md", () => {
   let project;
   beforeEach(() => ({ dir, project } = tempProject("demo-game")));
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const install = (...argv) => run(["install", project, ...argv]);
+  const install = (...argv) => run(["install", project, "--yes", ...argv]);
 
   test("new files name the project from its Git remote", async () => {
     spawnSync("git", ["-C", project, "remote", "set-url", "origin", "git@github.com:acme/space-game.git"]);
@@ -217,7 +304,11 @@ describe("AGENTS.md and CLAUDE.md", () => {
     const agents = read(project, "AGENTS.md");
     assert.ok(agents.startsWith("# space-game\n"));
     assert.ok(agents.includes("[`acme/space-game`](https://github.com/acme/space-game)"));
-    assert.match(checks.findBlock(agents), /## Agent workflow/);
+    const block = checks.findBlock(agents);
+    assert.match(block, /## Agent workflow/);
+    assert.match(block, /ask the user to run `npx skill-fleet@latest update`, which creates or repairs it\. /);
+    assert.match(block, /changes the project board on GitHub, so it runs only with the user's approval, after `--dry-run`/);
+    assert.match(block, /Do not edit by hand the files that `\.agents\/skill-fleet\.json` records/);
     assert.match(output, /fill the TODOs in AGENTS\.md/);
     assert.equal(checks.findBlock(read(project, "CLAUDE.md")), "@AGENTS.md\n");
     assert.deepEqual(checks.check(project), []);
@@ -225,9 +316,8 @@ describe("AGENTS.md and CLAUDE.md", () => {
 
   test("an existing AGENTS.md keeps its content", async () => {
     fs.writeFileSync(path.join(project, "AGENTS.md"), "# Mine\n\nKeep this rule.\n");
-    fs.mkdirSync(path.join(project, "docs/agents"), { recursive: true });
     for (const name of ["issue-tracker.md", "domain.md", "verification.md"]) {
-      fs.writeFileSync(path.join(project, "docs/agents", name), "Filled.\n");
+      write(project, `docs/agents/${name}`, template(name).replaceAll("TODO", "Filled"));
     }
     const first = await install();
     let agents = read(project, "AGENTS.md");
@@ -295,7 +385,7 @@ describe("AGENTS.md and CLAUDE.md", () => {
     assert.equal(exists(project, "AGENTS.md"), false);
     assert.equal(exists(project, "CLAUDE.md"), false);
     assert.deepEqual(checks.check(project), []);
-    await run(["update", project]);
+    await run(["update", project, "--yes"]);
     assert.equal(exists(project, "AGENTS.md"), false);
   });
 
@@ -331,7 +421,8 @@ describe("questions", () => {
   });
 
   test("flags skip their questions", async () => {
-    const { asked } = await ask({}, "--cursor", "--no-instructions");
+    const { asked } = await run(["install", project, "--cursor", "--no-instructions"],
+      { interactive: true, github: readyGitHub() });
     assert.deepEqual(asked, []);
   });
 
@@ -380,7 +471,7 @@ describe("GitHub setup", () => {
 
   test("creates a linked board with the workflow's statuses and sprints", async () => {
     const github = new FakeGitHub();
-    const { code, output } = await install(github);
+    const { code, output } = await install(github, {}, "--yes");
     assert.equal(code, 0, output);
     assert.match(output, /How the workflow runs/);
     assert.match(output, /Created the project board "space-game Sprints"/);
@@ -407,13 +498,58 @@ describe("GitHub setup", () => {
 
   test("a second install reuses the board and changes nothing on GitHub", async () => {
     const github = new FakeGitHub();
-    await install(github);
+    await install(github, {}, "--yes");
     const before = github.mutations().length;
     const { code, output } = await install(github);
     assert.equal(code, 0, output);
     assert.equal(github.boards.length, 1);
     assert.equal(github.mutations().length, before);
     assert.doesNotMatch(output, /How the workflow runs/);
+  });
+
+  test("without a terminal or --yes, a board change stops before anything is written", async () => {
+    const github = new FakeGitHub();
+    const created = await install(github);
+    assert.equal(created.code, 1);
+    assert.match(created.output, /makes them only with your consent:\n {2}- create the project board "space-game Sprints" owned by acme/);
+    assert.match(created.output, /Nothing was written, on GitHub or on disk\. Rerun in a terminal to be asked first, or rerun with --yes/);
+    const repair = new FakeGitHub();
+    repair.addBoard({ title: "Roadmap", linkedTo: "acme/space-game" });
+    const repaired = await install(repair);
+    assert.equal(repaired.code, 1);
+    assert.match(repaired.output, /- add In review to the Status field on "Roadmap"/);
+    const named = new FakeGitHub();
+    named.addBoard({ title: "Team board" });
+    const linked = await install(named, {}, "--board", "Team board");
+    assert.equal(linked.code, 1);
+    assert.match(linked.output, /- link the project board "Team board" to acme\/space-game/);
+    assert.match(linked.output, /- add a Sprint field with 2-week sprints on "Team board"/);
+    for (const fake of [github, repair, named]) assert.equal(fake.mutations().length, 0);
+    assert.deepEqual(fs.readdirSync(project), [".git"]);
+  });
+
+  test("--yes creates or repairs the board without a terminal", async () => {
+    const github = new FakeGitHub();
+    const roadmap = github.addBoard({ title: "Roadmap", linkedTo: "acme/space-game" });
+    const { code, output, asked } = await install(github, {}, "--yes");
+    assert.equal(code, 0, output);
+    assert.deepEqual(asked, []);
+    assert.match(output, /Updated the project board "Roadmap"/);
+    assert.ok(field(roadmap, "Status").options.some((o) => o.name === "In review"));
+  });
+
+  test("an interactive run asks before it creates a board", async () => {
+    const github = new FakeGitHub();
+    const declined = await install(github, { interactive: true, answers: { create: false } });
+    assert.equal(declined.code, 1);
+    assert.ok(declined.asked.some((q) => q.startsWith(
+      'No project board is linked to acme/space-game. Create the project board "space-game Sprints"')));
+    assert.match(declined.output, /needs a project board\. Nothing was written/);
+    assert.equal(github.mutations().length, 0);
+    assert.deepEqual(fs.readdirSync(project), [".git"]);
+    const accepted = await install(github, { interactive: true });
+    assert.equal(accepted.code, 0, accepted.output);
+    assert.equal(github.boards.length, 1);
   });
 
   test("an existing linked board is repaired without losing its options", async () => {
@@ -463,7 +599,7 @@ describe("GitHub setup", () => {
     assert.equal(JSON.parse(read(project, checks.MANIFEST)).github.board.title, "Two");
   });
 
-  test("--board links one of the owner's boards", async () => {
+  test("--board links one of the owner's boards, without --yes", async () => {
     const github = new FakeGitHub();
     const other = github.addBoard({ title: "Team board", statuses: ["Todo", "In progress", "In review", "Done"],
       iteration: "Sprint" });
@@ -485,7 +621,7 @@ describe("GitHub setup", () => {
     assert.ok(github.repo("acme/space-game").linked.has(other.id));
   });
 
-  test("a dry run changes nothing on GitHub", async () => {
+  test("a dry run changes nothing on GitHub, and needs no consent", async () => {
     const github = new FakeGitHub();
     const { code, output } = await install(github, {}, "--dry-run");
     assert.equal(code, 0);
@@ -498,7 +634,7 @@ describe("GitHub setup", () => {
   test("an existing tracker file is left alone, with a note when it names another board", async () => {
     fs.mkdirSync(path.join(project, "docs/agents"), { recursive: true });
     fs.writeFileSync(path.join(project, "docs/agents/issue-tracker.md"), "# Mine\n");
-    const { code, output } = await install(new FakeGitHub());
+    const { code, output } = await install(new FakeGitHub(), {}, "--yes");
     assert.equal(code, 0);
     assert.equal(read(project, "docs/agents/issue-tracker.md"), "# Mine\n");
     assert.match(output, /does not name the board "space-game Sprints"/);
@@ -546,7 +682,7 @@ describe("GitHub setup", () => {
   });
 
   test("an organization records that issue types exist", async () => {
-    await install(new FakeGitHub({ ownerType: "Organization" }));
+    await install(new FakeGitHub({ ownerType: "Organization" }), {}, "--yes");
     const tracker = read(project, "docs/agents/issue-tracker.md");
     assert.match(tracker, /^\| Owner type \| `Organization`\. \|$/m);
     assert.match(tracker, /^\| Issue types \| `Resolve from GitHub`\. \|$/m);
@@ -558,7 +694,7 @@ describe("check and list", () => {
   let project;
   beforeEach(async () => {
     ({ dir, project } = tempProject());
-    await run(["install", project]);
+    await run(["install", project, "--yes"]);
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -567,6 +703,32 @@ describe("check and list", () => {
       { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /skills, adapters for claude, cursor, and links check out/);
+  });
+
+  test("check notes paths the fleet does not manage, without changing its result", async () => {
+    write(project, ".agents/skills/tdd/scripts/old-helper.mjs", "// left over\n");
+    const own = "---\nname: house-style\ndescription: The project's own skill.\n---\n\nBody.\n";
+    write(project, ".agents/skills/house-style/SKILL.md", own);
+    for (const tool of ["claude", "cursor"]) {
+      const { dir: folder, fields } = checks.HARNESSES[tool];
+      write(project, `${folder}/house-style/SKILL.md`, checks.adapterText("house-style", own, fields));
+    }
+    assert.deepEqual(checks.check(project), []);
+    assert.deepEqual(checks.unmanaged(project), [".agents/skills/house-style/", ".agents/skills/tdd/scripts/old-helper.mjs"]);
+    const passed = await run(["check", project]);
+    assert.equal(passed.code, 0, passed.output);
+    assert.match(passed.output, /^Note: the fleet does not manage these paths in \.agents\/skills\/:$/m);
+    assert.match(passed.output, /^ {2}\.agents\/skills\/house-style\/$/m);
+    assert.match(passed.output, /^Delete a path that is left over from an earlier copy of the fleet\. A project's own skill can stay\.$/m);
+    const standalone = spawnSync(process.execPath, [path.join(project, ".agents/scripts/check-skills.mjs")],
+      { encoding: "utf8" });
+    assert.equal(standalone.status, 0, standalone.stderr);
+    assert.match(standalone.stdout, /^ {2}\.agents\/skills\/tdd\/scripts\/old-helper\.mjs$/m);
+    fs.unlinkSync(path.join(project, ".cursor/skills/house-style/SKILL.md"));
+    const failed = await run(["check", project]);
+    assert.equal(failed.code, 1);
+    assert.match(failed.output, /does not manage these paths/);
+    assert.match(failed.output, /missing cursor adapter for house-style/);
   });
 
   test("adapter drift is reported", () => {
@@ -633,5 +795,42 @@ describe("arguments and frontmatter", () => {
 
   test("missing frontmatter is an error", () => {
     assert.throws(() => checks.splitFrontmatter("# No frontmatter\n"));
+  });
+});
+
+describe("versions and profile settings", () => {
+  test("versions compare by number, not as strings", () => {
+    assert.equal(compareVersions("1.10.0", "1.9.0"), 1);
+    assert.equal(compareVersions("2.0.0", "10.0.0"), -1);
+    assert.equal(compareVersions("1.4.0", "v1.4.0"), 0);
+    assert.equal(compareVersions("1.5.0-beta.1", "1.5.0"), -1);
+    assert.equal(compareVersions("1.5.0-beta.2", "1.5.0-beta.10"), -1);
+    assert.equal(compareVersions("1.5.0-1", "1.5.0-alpha"), -1);
+    assert.equal(compareVersions("1.5.0+build.7", "1.5.0"), 0);
+    assert.equal(compareVersions("next", "1.0.0"), null);
+    assert.equal(compareVersions(undefined, "1.0.0"), null);
+  });
+
+  test("profile settings come from the template's settings, routing, and boundaries tables", () => {
+    const templateText = [
+      "## Settings", "", "| Setting | Value |", "| --- | --- |", "| Platform | TODO |", "| Deploys | TODO |",
+      "| TODO component | TODO |", "",
+      "## Boundaries", "", "| Boundary | Producer | Local check |", "| --- | --- | --- |", "| TODO | TODO | TODO |", "",
+      "## Services", "", "| Service | Rule |", "| --- | --- |", "| TODO | Ask first. |", "",
+    ].join("\n");
+    const partial = "| Setting | Value |\n| --- | --- |\n| **Platform** | `web` |\n\n"
+      + "| Boundary | Producer |\n| --- | --- |\n| API | web |\n";
+    assert.deepEqual(missingSettings(templateText, partial), ["Deploys", "Local check"]);
+    const complete = "| Setting | Value |\n| --- | --- |\n| Platform | web |\n| Deploys | None |\n\nBoundaries: None.\n";
+    assert.deepEqual(missingSettings(templateText, complete), []);
+  });
+
+  test("the templates yield the settings to look for, and lack none of them", () => {
+    assert.ok(missingSettings(template("issue-tracker.md"), "").includes("Default repository"));
+    assert.ok(missingSettings(template("verification.md"), "").includes("Platform"));
+    assert.ok(missingSettings(template("domain.md"), "| Boundary |\n| --- |\n").includes("Producer"));
+    for (const name of ["issue-tracker.md", "domain.md", "verification.md"]) {
+      assert.deepEqual(missingSettings(template(name), template(name)), [], name);
+    }
   });
 });

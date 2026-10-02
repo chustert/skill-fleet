@@ -8,7 +8,7 @@ skill-fleet is opinionated about where work lives. Every project that uses it ru
 
 - **A GitHub repository.** Issues and pull requests live there. The installer stops when the project folder is not a GitHub repository, and shows how to create one.
 - **The GitHub CLI (`gh`), logged in.** The skills and their scripts talk to GitHub through it. When `gh` is missing, the installer offers to install it, with Homebrew on macOS or winget on Windows, and otherwise points to [cli.github.com](https://cli.github.com). When `gh` is not logged in, or its login lacks the `project` scope the board needs, it offers to fix that in your browser.
-- **A GitHub Project board linked to the repository.** The board has a `Status` field with the options `Todo`, `In progress`, `In review`, and `Done`, and a `Sprint` field with two-week sprints. When the repository has no linked board, the installer creates one called `<repository> Sprints`, or links one of your existing boards if you pick it. When a linked board lacks a status option or the Sprint field, it adds them without touching the options already in use.
+- **A GitHub Project board linked to the repository.** The board has a `Status` field with the options `Todo`, `In progress`, `In review`, and `Done`, and a `Sprint` field with two-week sprints. When the repository has no linked board, the installer creates one called `<repository> Sprints`, or links one of your existing boards if you pick it. When a linked board lacks a status option or the Sprint field, it adds them without touching the options already in use. It asks before it creates, links, or repairs a board.
 
 The skills then move each issue across the board:
 
@@ -19,7 +19,7 @@ The skills then move each issue across the board:
 | `In review` | `prepare-pr`, when the pull request is ready for review |
 | `Done` | GitHub's built-in project workflow, when the issue closes |
 
-`sprint-status`, `sprint-recap`, and `repos-report` read the Sprint field to report on the current sprint. The board is not optional: when it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update`, which creates or repairs it. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
+`sprint-status`, `sprint-recap`, and `repos-report` read the Sprint field to report on the current sprint. The board is not optional. When it is missing or incomplete, a skill stops and asks you to run `npx skill-fleet@latest update`, which creates or repairs it. The command changes the project board on GitHub, so it runs only with your approval, after a `--dry-run` preview. The board starts with six sprints, about three months; add more in the Sprint field's settings on GitHub when they run out.
 
 ## How one skill set fits every project
 
@@ -52,14 +52,18 @@ It first checks GitHub as described [above](#how-it-works-github-issues-on-one-b
 2. **Create or update `AGENTS.md` and `CLAUDE.md`?** Described below.
 3. **Overwrite the conflicting files?** Asked only when a file the fleet would write already exists and the fleet did not write it, or you changed it since. The answer defaults to no.
 
-When several boards could serve the repository, it also asks which one to use. `--yes` skips every question and keeps the choices recorded by the last installation, or uses Claude Code, Cursor, and the instruction files the first time. Without a terminal, such as in CI, it asks nothing and behaves as with `--yes`. Flags answer a single question instead:
+When several boards could serve the repository, it also asks which one to use, and it asks before it creates, links, or repairs the board. `--yes` skips every question. It keeps the choices recorded by the last installation, or uses Claude Code, Cursor, and the instruction files the first time, and it makes the board changes the workflow needs.
+
+Without a terminal, such as in CI, the installer asks nothing and keeps the recorded choices, but it changes the board only with `--yes`. A run with neither a terminal nor `--yes` that would change the board lists the planned board changes, writes nothing on GitHub or on disk, and exits with an error. Rerun it in a terminal or with `--yes`.
+
+Flags answer a single question instead:
 
 | Flag | Effect |
 | --- | --- |
 | `--claude`, `--cursor`, `--kiro`, or `--tools claude,cursor` | Choose the tools; `--tools none` writes no adapters |
 | `--instructions`, `--no-instructions` | Create and update `AGENTS.md` and `CLAUDE.md`, or leave both alone |
-| `--force` | Overwrite conflicting files without asking |
-| `--board <number or title>` | Use this board of the repository's owner, linking it to the repository |
+| `--force` | Overwrite conflicting files without asking, and run over an installation made by a newer version |
+| `--board <number or title>` | Use this board of the repository's owner, linking it to the repository. Naming the board approves the link, also without a terminal |
 | `--dry-run` | Show what would change, on GitHub and on disk, and change nothing |
 
 The installer writes:
@@ -81,7 +85,7 @@ Every coding agent reads `AGENTS.md` first, and Claude Code reads `CLAUDE.md`. T
 
 - A project without `AGENTS.md` gets one from [the template](skills/setup-project/templates/AGENTS.template.md), headed with the project's name and linked to its GitHub repository, both read from its Git remote. The parts only a reader of the code can write, such as what the product is, where the source of truth lives, and the project's own safety rules, stay `TODO` until `setup-project` fills them.
 - A project without `CLAUDE.md` gets one that imports `AGENTS.md`, when Claude Code is one of the chosen tools. An existing `CLAUDE.md` that lacks the import gets it added at the top.
-- Both files carry a section between `<!-- skill-fleet:begin -->` and `<!-- skill-fleet:end -->` markers. In `AGENTS.md` it explains the workflow, where the profile lives, and which files not to edit by hand. The installer rewrites only that section on every update, and adds it to an `AGENTS.md` you wrote yourself without touching the rest.
+- Both files carry a section between `<!-- skill-fleet:begin -->` and `<!-- skill-fleet:end -->` markers. In `AGENTS.md` it explains the workflow and where the profile lives. It tells agents not to edit by hand the files `.agents/skill-fleet.json` records, while the project's own skills can sit beside them, and to ask you before running the installer, because the installer can change the board. The installer rewrites only that section on every update, and adds it to an `AGENTS.md` you wrote yourself without touching the rest.
 
 If you edit the section by hand, the next install reports a conflict rather than overwrite your change. If you delete it, the installer leaves it out from then on, unless you pass `--force`.
 
@@ -95,6 +99,14 @@ npx skill-fleet@latest list              # list the skills
 ```
 
 Each command takes the project folder as an optional argument, such as `npx skill-fleet@latest update ../my-app`, and defaults to the current folder. `update` asks the same questions with your previous answers selected. It checks GitHub again, recreating or repairing the board when it changed, updates changed files, removes files the fleet no longer ships, and leaves unchanged files alone. It never overwrites a file it did not write without asking, so a project that already has its own skills with the same names is safe.
+
+`install` and `update` refuse to run when the project's `.agents/skill-fleet.json` records a newer version than the one running, because the older version would replace newer skills with older ones. The message names both versions. Run `npx skill-fleet@<recorded version> update`, or `npx skill-fleet@latest update` once that version is published. `--force` runs the older version anyway.
+
+When `--force`, or a yes to the overwrite question, replaces files the fleet did not install, the installer lists them after the installation. Their previous versions remain in Git if they were committed, and `setup-project` reads them to carry any project facts into `docs/agents/` before they are lost.
+
+`update` and `check` print a note, never an error, for paths in `.agents/skills/` that the manifest does not record: a skill folder the fleet did not install, or a file inside a fleet skill folder, such as a script left over from an earlier hand-made copy. Delete a leftover. A project's own skill can stay.
+
+After an install or update, the installer lists what `setup-project` still has to do: profile files that are missing, `TODO`s, and settings the templates in `skills/setup-project/templates/` have that the project's profile files lack. It compares the first column of each settings table and the columns of the routing and boundaries tables, so the list names any row or column a newer template added after the profile was written.
 
 In a workspace that holds several independent repositories, install at the workspace root, where cross-repository work starts. Install into a child repository as well only if people also open it on its own. Each installation then needs its own profile. The board links to the workspace repository, and issues from every child repository of the same owner can sit on it.
 
