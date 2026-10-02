@@ -291,7 +291,7 @@ Resolve all required metadata before creating the issue:
    and option ID dynamically; never hard-code one. The board is required: if the
    settings name none, or GitHub no longer has it, stop and ask the user to run
    `npx skill-fleet@latest update`, which creates or repairs the board. The
-   command changes the project board on GitHub, so run it only with the user's
+   command changes the project board on GitHub, so it runs only with the user's
    approval, after `--dry-run` shows what it would change.
 6. If the user supplied a parent, resolve it to an unambiguous issue URL and
    verify that it exists. The new issue must be added as a sub-issue of that
@@ -363,11 +363,12 @@ every other GitHub object the reply names, including the parent issue,
 sub-issues, and any issue or pull request cited as grounding. Inside the issue
 body itself, use the plain `#number` or `owner/repo#number` autolink instead.
 
-Also report the repository and owning component, or the components that may be
-involved when the owner is uncertain, selected form, issue type when one
-applies, labels, board status, parent and sub-issue relationship when present,
-the project sources used to ground added factual claims, and any attachment or
-configuration that could not be applied.
+Also report the repository and owning component, selected form, issue type
+when one applies, labels, board status, parent and sub-issue relationship when
+present, the project sources used to ground added factual claims, and any
+attachment or configuration that could not be applied. When the owner is
+uncertain, report the components that may be involved instead of the owning
+component.
 
 Stop after creation and verification. Do not start implementation, create a
 branch, assign anyone, move the issue to the started status, add comments, or

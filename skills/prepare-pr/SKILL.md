@@ -16,11 +16,13 @@ unless the user separately and explicitly authorized that exact action.
 
 ### Establish the exact change
 
-1. Read the documents in the reading order of `docs/agents/domain.md`,
-   including the guide or `README.md` for each affected component. Also read
-   the routing table and default base branch in `docs/agents/issue-tracker.md`,
-   and each affected component's settings in `docs/agents/verification.md`.
-   Handle a missing profile file, or a `TODO` or `None` value, as the
+1. Read the applicable repository instructions, with any nested instructions
+   for the changed paths, and the documents in the reading order of
+   `docs/agents/domain.md`, including the guide or `README.md` for each
+   affected component. Also read the routing table and default base branch in
+   `docs/agents/issue-tracker.md`, and each affected component's settings in
+   `docs/agents/verification.md`. Handle a missing profile file, or a `TODO`
+   or `None` value, as the
    [project profile](../../references/project-profile.md) describes.
 2. Identify the repository, remote, current branch, intended base branch, and
    whether the repositories involved have independent Git histories. The base
@@ -229,7 +231,7 @@ Immediately before creating or updating the PR:
    while keeping the verified PR intact. If the settings name no board, or
    GitHub no longer has it, say so and ask the user to run
    `npx skill-fleet@latest update`, which creates or repairs the board. The
-   command changes the project board on GitHub, so run it only with the user's
+   command changes the project board on GitHub, so it runs only with the user's
    approval, after `--dry-run` shows what it would change.
 
 If creation fails or GitHub reports an existing PR, do not retry in a way that

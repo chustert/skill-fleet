@@ -76,25 +76,28 @@ the edit itself touches only one side.
    reference, changelog, or format notes. Do not use agent files as the only
    technical specification.
 9. Verify each side with its commands in `docs/agents/verification.md`. Then run
-   the smallest local check across the boundary, starting from the boundary's
-   `Local check` in the `Boundaries` table of `docs/agents/domain.md`, such as
-   a local run where one side calls the other. Cover the version combinations
-   that run does not reach with an old payload fixture against the new
-   consumer, an old save file loaded by the new build, or the previous client
-   against the new local server. Do not infer compatibility from two
-   independently green suites. Mark a combination that cannot run locally
-   `Not verified` and name the missing environment or artifact.
+   the smallest local check across the boundary. Start from the boundary's
+   `Local check` in the `Boundaries` table of `docs/agents/domain.md`, which
+   records how to run both sides together locally. Cover the version
+   combinations that check does not reach with an old payload fixture against
+   the new consumer, an old save file loaded by the new build, or the previous
+   client against the new local server. When the boundary has no row in the
+   table, or its `Local check` is `None`, cover every combination that way. Do
+   not infer compatibility from two independently green suites. Mark a
+   combination that cannot run locally `Not verified` and name the missing
+   environment or artifact.
 
 ## Report
 
-10. In the plan, the handoff, and each pull request, write a change note. When
-    the contracts document defines its own change-note template, fill in that
-    template. Otherwise state the contract before and after, the combinations
-    that must keep working, the rollout and rollback order, any migration,
-    backfill, reindex, data conversion, environment variable, or release it
-    needs, the verification on each side and across the boundary, and any
-    external verification still missing. Link the issue and every related
-    issue or pull request wherever you name it, per the
+10. In the plan, the handoff, and each pull request, write a change note. It
+    states the contract before and after, the combinations that must keep
+    working, the rollout and rollback order, any migration, backfill, reindex,
+    data conversion, environment variable, or release it needs, the
+    verification on each side and across the boundary, and any external
+    verification still missing. When the contracts document defines its own
+    change-note template, fill in that template and add any of these items it
+    lacks. Link the issue and every related issue or pull request wherever you
+    name it, per the
     [GitHub reference rules](../../references/github-references.md). Inside
     GitHub text use the plain `#number` or `owner/repo#number` autolink.
 

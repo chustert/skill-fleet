@@ -1,6 +1,6 @@
 ---
 name: verify-work
-description: Verify local implementation work against the originating GitHub issue and approved specification using the exact documented project commands, direct runtime evidence for each affected platform, explicit device, hardware, and hosted-service limitations, and boundary compatibility checks, then run pr-review in a fresh-context subagent as a separate code-quality pass. Use after implementation and before pull-request preparation. Observe and report only; never fix, commit, push, deploy, create a pull request, or change issue state.
+description: Verify local implementation work against the originating GitHub issue and approved specification using the exact documented project commands, direct runtime evidence for each affected platform, explicit device, hardware, hosted-service, and paid-API limitations, and boundary compatibility checks, then run pr-review in a fresh-context subagent as a separate code-quality pass. Use after implementation and before pull-request preparation. Observe and report only; never fix, commit, push, deploy, create a pull request, or change issue state.
 ---
 
 # Verify work
@@ -154,19 +154,19 @@ Keep these evidence categories separate in the report:
   `docs/agents/verification.md`, or any other secret-bearing file.
 - **Hosted infrastructure:** the deployments and other online targets listed
   under `Online, hosted, and paid services` in `docs/agents/verification.md`,
-  plus any other preview, staging, or production environment and any remote
-  database.
+  plus any other preview, staging, or production environment, any remote
+  database, and any other online service.
 - **Paid third-party APIs:** the paid services listed in the same section, plus
   any other third-party API that costs money, sends real messages, or acts on
-  real accounts, such as a payment sandbox, email delivery, an AI API, or a
-  store or platform service.
+  real accounts, and its sandbox or test mode. Examples are a payments sandbox,
+  email delivery, an AI API, and a store or platform service.
 
-Local verification does not authorize contacting hosted infrastructure or a
-paid third-party API. Explain why local evidence is insufficient, name the
-target, the actions, the expected side effects and cost, and obtain explicit
-permission for that specific check. An unavailable simulator, device, hardware,
-credential, or service produces `Not verified` for the affected claim, reported
-separately from test failures and code defects.
+Local verification does not authorize contacting any online service, including
+hosted infrastructure and paid third-party APIs. Explain why local evidence is
+insufficient, name the target, the actions, the expected side effects and cost,
+and obtain explicit permission for that specific check. An unavailable
+simulator, device, hardware, credential, or service produces `Not verified` for
+the affected claim, reported separately from test failures and code defects.
 
 ## Boundary compatibility
 
@@ -178,7 +178,9 @@ Verify every affected component and repository independently, then exercise the
 smallest available compatibility path across the shared boundary. Start from
 the boundary's `Local check` in the `Boundaries` table of
 `docs/agents/domain.md`, which records how to run both sides together locally.
-Record:
+When the boundary has no row in the table, or its `Local check` is `None`,
+exercise each combination with old payload fixtures, earlier stored data, or
+earlier builds instead. Record:
 
 - the producer and consumer, and which versions of each can meet during
   rollout, including clients already installed on users' devices;

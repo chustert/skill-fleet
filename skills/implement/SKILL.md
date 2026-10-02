@@ -63,8 +63,8 @@ commits, and eventual pull requests separate for each Git repository.
 - For new or changed observable behaviour, invoke `tdd` before changing the
   production behaviour. Use the test seams established by `start-issue`; if a
   seam is missing, identify it before writing the test. When no harness fits
-  the seam, follow `tdd`'s rules for that case rather than skipping the
-  evidence.
+  the seam, follow the `When no harness fits the seam` section of `tdd` rather
+  than skipping the evidence.
 - For a reported defect, regression, unexpected failure, or performance issue,
   invoke `diagnosing-bugs`. Do not start with a speculative fix. When a fix is
   authorized and a correct seam exists, lock the cause down with a failing

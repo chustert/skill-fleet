@@ -70,9 +70,9 @@ started it:
   request;
 - that it must not open, print, or quote the protected files listed in
   `docs/agents/verification.md`, or any other secret-bearing file. Name those
-  files in the brief. When `docs/agents/verification.md` is missing, name the
-  files the protected-file rules in `AGENTS.md` cover instead, so that no brief
-  goes out without the list; and
+  files in the brief. When `docs/agents/verification.md` is missing, or its
+  protected files are still `TODO`, name the files the protected-file rules in
+  `AGENTS.md` cover instead, so that no brief goes out without the list; and
 - that it must stop and report back when a step needs the user's approval,
   instead of asking or going ahead.
 
