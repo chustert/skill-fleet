@@ -1154,6 +1154,21 @@ describe("versions and profile settings", () => {
       [{ name: "Deploys", component: null }]);
   });
 
+  test("a Setting table is a component only when it shares a row with the template's and no template heading names it", () => {
+    const verification = template("verification.md");
+    const [component] = markdownTables(verification).filter((t) => t.header[0] === "Setting");
+    const rows = component.rows.map(([name]) => `| ${name} | Filled |`);
+    const last = component.rows.at(-1)[0];
+    const section = (heading, lines) => `${heading}\n\n| Setting | Value |\n| --- | --- |\n${lines.join("\n")}\n\n`;
+    const local = ["| Services | A database in a container |", "| Health check | A request to the local API |"];
+    const own = section("## Web (`web/`)", rows) + section("## Worker (`worker/`)", rows.slice(0, -1))
+      + section("## Local stack", local) + section("## Release notes", ["| Owner | The release manager |"]);
+    assert.deepEqual(missingSettings(verification, own).rows, [{ name: last, component: "Worker (`worker/`)" }]);
+    const nested = "## Components\n\n" + section("### Web (`web/`)", rows) + section("### Worker (`worker/`)", rows.slice(0, -1))
+      + section("### Local stack", local);
+    assert.deepEqual(missingSettings(verification, nested).rows, [{ name: last, component: "Worker (`worker/`)" }]);
+  });
+
   test("the templates yield the settings to look for, and lack none of them", () => {
     const rows = (missing) => missing.rows.map((row) => row.name);
     assert.ok(rows(missingSettings(template("issue-tracker.md"), "")).includes("Default repository"));
