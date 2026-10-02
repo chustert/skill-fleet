@@ -30,8 +30,8 @@ them to flags:
 
 The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
 `--all-repos` instead of `--repo` only when the user asks for every repository
-of the owner, or the routing table says the board tracks all of them. Never
-pass the template's placeholder `owner/repo`. The script rejects it. If another
+of the owner. Never pass the template's placeholder `owner/repo`. The script
+rejects it. If another
 value the command needs is still `TODO`, say so and recommend `setup-project`
 rather than guessing. The board is required: if the settings name none, ask the
 user to run `npx skill-fleet@latest update --dry-run`, and then
