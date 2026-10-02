@@ -24,15 +24,18 @@ either file it owns only the section between the `skill-fleet:begin` and
 
 Invoking this skill authorizes reading the project, running read-only `git` and
 `gh` queries, creating or editing the three profile files, and replacing the
-`TODO` placeholders the installer left in `AGENTS.md`. It does not authorize
-editing any other file or any hand-written part of `AGENTS.md` or `CLAUDE.md`,
-editing or restoring a file the fleet installed, creating labels, boards,
-fields, or issues, running the fleet installer, installing tools, running
-builds or tests, or opening protected files. Never edit the skill-fleet
-section; the installer rewrites it. Propose any other change, such as an
-addition to a hand-written `AGENTS.md`, permission deny rules, or a renamed row
-or column in an existing profile file, as a diff, and apply it only after the
-user approves it.
+`TODO` placeholders the installer left in `AGENTS.md`. Editing an existing
+profile file includes filling a value and adding a row, column, or section that
+its template has and the file lacks. It does not authorize editing any other
+file or any hand-written part of `AGENTS.md` or `CLAUDE.md`, editing or
+restoring a file the fleet installed, creating labels, boards, fields, or
+issues, running the fleet installer, installing tools, running builds or tests,
+or opening protected files. Never edit the skill-fleet section; the installer
+rewrites it. Propose any other change as a diff, and apply it only after the
+user approves it. Such changes include an addition to a hand-written
+`AGENTS.md`, permission deny rules, removing or narrowing a project skill, and,
+in an existing profile file, a renamed row, column, or section, a setting moved
+out of the row that held it, or a changed value the user wrote.
 
 Record only what evidence supports. Write `TODO` with a short note of what would
 resolve a value you could not establish, and `None` only for something you
@@ -69,8 +72,10 @@ skill-fleet section "was edited by hand". It overwrites them only with
 committed. A project can also keep its own skills beside the fleet's, such as a
 skill with a fleet skill's name in the folder of a tool that got no adapter.
 These files often hold the project facts the profile needs, so read them before
-you fill it. Skip this step when the installation replaced no project content
-and no project skill sits beside the fleet's.
+you fill it. Hand-written instructions can also still describe the project's
+earlier skills. Skip this step when the installation replaced no project
+content, no project skill sits beside the fleet's, and no hand-written
+instruction mentions skills, adapters, or skill checks.
 
 1. Find the replaced files. Use the conflicts the installer printed when the
    user still has its output. Otherwise read them from Git. Every committed
@@ -106,7 +111,10 @@ and no project skill sits beside the fleet's.
    `git ls-tree -r --name-only <commit>~1 -- .agents/skills/` for the first
    commit, and the same for each tool's skill folder, such as
    `.claude/skills/`. Also read the project's own skills that still sit
-   beside the fleet's.
+   beside the fleet's, and the rules about skills, adapters, and skill checks
+   in the hand-written parts of `AGENTS.md` and `CLAUDE.md` and in any other
+   document in `docs/agents/`. Step 9 compares those rules with the
+   skill-fleet section.
 3. Collect the project facts they hold: commands and their working
    directories, paths, services, safety rules, board and status names, time
    zones, and the steps that gather runtime evidence.
@@ -117,9 +125,15 @@ and no project skill sits beside the fleet's.
 5. When a fact differs from a value already in the profile, including one the
    installer recorded, show both values with their sources and ask the user
    which is right. Such a fact is not already covered.
-6. A tool that loads a project skill with a fleet skill's name runs the old
-   workflow beside the fleet's. Propose removing or renaming each such skill
-   as a diff for approval.
+6. A project skill that does a fleet skill's job competes with it: a tool can
+   load either one for the same request, and the project skill runs the old
+   workflow. Compare each project skill's name and `description` with the
+   fleet skills'. For a project skill with a fleet skill's name, or with a
+   description that covers the same requests, such as a project's own
+   boundary-change skill beside `cross-boundary-contract`, propose one of two
+   changes as a diff for approval: remove it with its adapters, or narrow it to
+   what the fleet skill does not cover and move its project facts into the
+   profile.
 7. Report every fact in the summary of step 10 as one of:
    - moved, with the row it went to;
    - already covered, with the file and section that cover it;
@@ -150,10 +164,14 @@ user confirms it. Run read-only queries and record names, not IDs.
   update creates or repairs the project board on GitHub. Do not run either
   command yourself unless the user approves it. Continue with the rest.
 - If `docs/agents/issue-tracker.md` predates the installer and names no board,
-  ask for the update first, as the previous item describes. The installer
-  never changes an existing
-  `docs/agents/issue-tracker.md`, so record the board it creates or links. The
-  board is required; never record `None` for it.
+  take the board the installer set up from `github.board` in
+  `.agents/skill-fleet.json`: its `owner`, `number`, `title`, and `url`. The
+  installer never changes an existing `docs/agents/issue-tracker.md`. Confirm
+  the board with `gh project field-list <number> --owner <owner> --format json`,
+  and record it in the `Project board` row as
+  `` `<title>` owned by `<owner>`: <url> ``. Ask for the update, as the
+  previous item describes, only when the manifest names no board or GitHub no
+  longer has it. The board is required; never record `None` for it.
 - Issue types, for an organization only:
   `gh api graphql -f query='query($l:String!){organization(login:$l){issueTypes(first:25){nodes{name description isEnabled}}}}' -f l=<owner>`.
   Keep `Resolve from GitHub` when enabled types exist, otherwise record `None`.
@@ -278,9 +296,10 @@ lanes, or the engine's command line.
   - a table that lacks a template column, such as a Boundaries table without
     `Local check`, or a routing table without `Repository` and `Local path`.
 
-  Propose the renames and additions as a diff, and apply it only after the
-  user approves. Keep every value the user wrote, and keep sections the
-  template does not have.
+  Add a missing row, column, or section directly, with the value you found or
+  `TODO`. Propose the renames and moved settings as a diff, and apply it only
+  after the user approves. Keep every value the user wrote, and keep sections
+  the template does not have.
 - Keep the profile a configuration record, not a copy of the documentation.
   Link the architecture, contracts, and testing guides rather than restating
   them.
@@ -316,6 +335,17 @@ When `AGENTS.md` was written by hand before the fleet arrived, leave its
 structure alone. Compare it with the sections of the template, and propose only
 the always-relevant instructions it lacks, as a diff for approval.
 
+Then compare the hand-written parts of `AGENTS.md` and `CLAUDE.md`, and any
+other document in `docs/agents/`, with the skill-fleet section. Look for a rule
+that contradicts the section, such as one to edit the skill adapters by hand or
+to run a checker other than `node .agents/scripts/check-skills.mjs`, and for a
+rule that points to a skill, script, or reference file the fleet replaced, such
+as link rules in a project document that
+`.agents/references/github-references.md` now holds. An agent that follows
+such a rule runs the old workflow, and a hand edit to a fleet file stops the
+next update with a conflict. Propose removing or rewording each one, as a diff
+for approval.
+
 In a workspace of independent repositories, the workspace `AGENTS.md` covers
 the workspace and its boundaries, and each child repository keeps its own
 `AGENTS.md`. Read those; do not copy them into the workspace file.
@@ -345,10 +375,12 @@ Present a compact summary:
   rules, and the source of each statement;
 - every remaining `TODO`, in the profile or in `AGENTS.md`, and the question
   that would resolve it;
-- proposed changes that need approval, such as renamed rows and columns in an
-  existing profile file, deny rules, additions to a hand-written `AGENTS.md`,
-  or removing a project skill that shares a fleet skill's name, as diffs
-  awaiting approval.
+- the rows, columns, and sections added to existing profile files;
+- proposed changes that need approval, as diffs awaiting approval: renamed
+  rows, columns, or sections and moved settings in an existing profile file,
+  deny rules, additions to a hand-written `AGENTS.md`, hand-written rules that
+  contradict the skill-fleet section or point to replaced files, and project
+  skills to remove or narrow because they share a fleet skill's name or job.
 
 Ask the user to confirm or correct the judgement calls: routing ownership,
 fallback repository, quality weighting, the project intent, and anything
