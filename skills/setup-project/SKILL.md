@@ -1,6 +1,6 @@
 ---
 name: setup-project
-description: Adapt the skill fleet to a project by inspecting its repositories, GitHub tracker and board, components, platforms, verification commands, knowledge documents, boundaries, and secret files, then writing the project profile in docs/agents/ that every other skill reads and tailoring the project's AGENTS.md and CLAUDE.md. Use after installing the fleet, when a skill reports a missing or TODO profile value, or when the project's structure, board, or commands change. Reads GitHub but never changes it.
+description: Adapt the skill fleet to a project by inspecting its repositories, GitHub tracker and board, components, platforms, verification commands, deployments, knowledge documents, boundaries, secret files, and any earlier skills the fleet replaced, then writing the project profile in docs/agents/ that every other skill reads and tailoring the project's AGENTS.md and CLAUDE.md. Use after installing the fleet, when a skill reports a missing or TODO profile value, or when the project's structure, board, or commands change. Reads GitHub but never changes it.
 ---
 
 # Set up project
@@ -11,9 +11,10 @@ guessing. The profile is three files under `docs/agents/`, described in the
 
 - `issue-tracker.md`: tracker settings, board, lifecycle statuses, branch
   conventions, and the routing table;
-- `domain.md`: reading order, boundaries, ADR location, and quality weighting;
-- `verification.md`: per-component commands and evidence, services that need
-  approval, protected files, and review-worktree setup.
+- `domain.md`: reading order, boundaries and their local checks, ADR location,
+  and quality weighting;
+- `verification.md`: per-component commands, evidence, and deployments,
+  services that need approval, protected files, and review-worktree setup.
 
 Then tailor the project's instruction files. The fleet installer creates
 `AGENTS.md` from `templates/AGENTS.template.md` when the project has none, and
@@ -25,11 +26,13 @@ Invoking this skill authorizes reading the project, running read-only `git` and
 `gh` queries, creating or editing the three profile files, and replacing the
 `TODO` placeholders the installer left in `AGENTS.md`. It does not authorize
 editing any other file or any hand-written part of `AGENTS.md` or `CLAUDE.md`,
-creating labels, boards, fields, or issues, installing tools, running builds or
-tests, or opening protected files. Never edit the skill-fleet section; the
-installer rewrites it. Propose any other change, such as an addition to a
-hand-written `AGENTS.md` or permission deny rules, as a diff, and apply it only
-after the user approves it.
+editing or restoring a file the fleet installed, creating labels, boards,
+fields, or issues, running the fleet installer, installing tools, running
+builds or tests, or opening protected files. Never edit the skill-fleet
+section; the installer rewrites it. Propose any other change, such as an
+addition to a hand-written `AGENTS.md`, permission deny rules, or a renamed row
+or column in an existing profile file, as a diff, and apply it only after the
+user approves it.
 
 Record only what evidence supports. Write `TODO` with a short note of what would
 resolve a value you could not establish, and `None` only for something you
@@ -55,7 +58,46 @@ because every later skill will trust it.
    `docs/agents/`. Existing profile files are the starting point. Update them in
    place and never discard a value the user wrote without asking.
 
-## 2. Read the tracker
+## 2. Harvest the project's earlier skills and docs
+
+A project may arrive with skills, scripts, or agent documents of its own. When
+the installer meets a file it did not write, it reports that the file "exists
+and was not installed by the fleet", and overwrites it only with `--force` or
+the user's consent. The previous version stays in Git. A project can also keep
+its own skills beside the fleet's, such as a skill with a fleet skill's name in
+the folder of a tool that got no adapter. These files often hold the project
+facts the profile needs, so read them before you fill it. Skip this step when
+the installation replaced no project file and no project skill sits beside the
+fleet's.
+
+1. Find the replaced files. Use the conflicts the installer printed when the
+   user still has its output. Otherwise find the commit that added
+   `.agents/skill-fleet.json` with
+   `git log --diff-filter=A --format=%H -- .agents/skill-fleet.json`, and list
+   the files it changed with `git show --stat <commit>`. When the installation
+   is not committed yet, `git status` lists the changed files.
+2. Read each previous version with `git show <commit>^:<path>`. List the
+   project's skills from before the fleet with
+   `git ls-tree -r --name-only <commit>^ -- .agents/skills/`, and the same
+   for each tool's skill folder, such as `.claude/skills/`. Before the
+   installation is committed, use `HEAD` in place of `<commit>^`. Also read
+   the project's own skills that still sit beside the fleet's.
+3. Collect the project facts they hold: commands and their working
+   directories, paths, services, safety rules, board and status names, time
+   zones, and the steps that gather runtime evidence.
+4. Propose a profile row for each fact, or an `AGENTS.md` line for a rule that
+   applies to every task. When no template row fits, put the fact in the
+   closest profile section and note that no skill reads it yet.
+5. Report every fact in the summary of step 10 as one of:
+   - moved, with the row it went to;
+   - already covered, with the file and section that cover it;
+   - dropped, with the reason, such as a step of the old workflow that a
+     fleet skill now performs.
+
+Never edit or restore a fleet file to keep a fact. The installer owns those
+files and reports any change to them as a conflict on the next update.
+
+## 3. Read the tracker
 
 The installer has already made sure the project is a GitHub repository, that
 `gh` is installed and logged in with the `repo` and `project` scopes, and that
@@ -68,11 +110,16 @@ queries and record names, not IDs.
 - Check the recorded board against GitHub: `gh project field-list <number>
   --owner <owner> --format json` lists its `Status` options and iteration field.
   If the board is missing, unlinked, or lacks an option or the iteration field,
-  do not repair it here. Tell the user to run `npx skill-fleet@latest update`,
-  which creates or repairs it, and continue with the rest.
+  do not repair it here. Ask the user to run `npx skill-fleet@latest update`,
+  which creates or repairs the board. The update changes the project board on
+  GitHub, so it runs only with the user's approval, after
+  `npx skill-fleet@latest update --dry-run` shows what it would change.
+  Continue with the rest.
 - If `docs/agents/issue-tracker.md` predates the installer and names no board,
-  ask the user to run `npx skill-fleet@latest update` first. The board is
-  required; never record `None` for it.
+  ask the user to run `npx skill-fleet@latest update` first, with the same
+  approval and dry run. The installer never changes an existing
+  `docs/agents/issue-tracker.md`, so record the board it creates or links. The
+  board is required; never record `None` for it.
 - Issue types, for an organization only:
   `gh api graphql -f query='query($l:String!){organization(login:$l){issueTypes(first:25){nodes{name description isEnabled}}}}' -f l=<owner>`.
   Keep `Resolve from GitHub` when enabled types exist, otherwise record `None`.
@@ -85,7 +132,7 @@ queries and record names, not IDs.
   several repositories, propose where issues with an unclear owner belong, and
   the rule for work that spans components; the user confirms.
 
-## 3. Map components and platforms
+## 4. Map components and platforms
 
 Identify components from the directory structure and the manifests. Read file
 names and manifest contents; do not run anything.
@@ -107,7 +154,7 @@ Build the routing table: component, repository, local path relative to the
 project root, and what it owns, in the project's own words where the
 documentation has them.
 
-## 4. Find the verification commands
+## 5. Find the verification commands and deployments
 
 For each component, find the documented commands. Sources, in order of
 authority: `AGENTS.md`, the README and contributing or testing guides, CI
@@ -122,13 +169,22 @@ lanes, or the engine's command line.
 - Record how to run one focused test.
 - Record the local run command and the runtime evidence method, starting from
   the defaults in the component's platform guide in
-  [platforms](../../references/platforms/README.md).
+  [platforms](../../references/platforms/README.md). When the component has
+  several surfaces, such as pages, a public API, and a script that other sites
+  embed, record one runtime evidence entry for each.
 - Record prerequisites: local services, seeded data, accounts, simulators,
   devices, engine or SDK versions, and licences.
+- Record what a merge or release triggers in the `Deploys` row. Look in the
+  deployment documentation, the contracts document, the release workflows in
+  `.github/workflows/`, and hosting configuration, such as a host's
+  configuration file or its auto-deploy setting. A host can deploy every merge
+  with nothing in the repository to show it, so ask the user when these
+  sources do not say. Write `None` only when the user or the sources confirm
+  that nothing deploys.
 - Do not run builds or tests to discover commands. Mark each command
   `(documented, not yet run)` until someone runs it in this checkout.
 
-## 5. Find services, protected files, and worktree needs
+## 6. Find services, protected files, and worktree needs
 
 - Protected files: find secret-bearing files by name only, such as ignored
   `.env` files other than examples, signing files and keystores,
@@ -147,33 +203,52 @@ lanes, or the engine's command line.
 - Propose Claude Code deny rules for the protected files, as `Read(...)` and
   `Edit(...)` entries in `.claude/settings.json`, shown as a diff for approval.
 
-## 6. Find the knowledge documents and boundaries
+## 7. Find the knowledge documents and boundaries
 
 - Record the paths of the glossary, architecture overview, component guides,
   contracts document, and ADR directory, or `None`. Do not write these
   documents here. List a significant gap, such as a multi-component project
   with no architecture overview, as a recommendation.
 - List the boundaries between parts that ship or version separately, using the
-  kinds `cross-boundary-contract` names. For each, record the producer, the
-  consumers, and which versions can meet during rollout. A project that ships
-  as one unit and keeps no data across releases records `None`.
+  kinds `cross-boundary-contract` names. A project that ships as one unit and
+  keeps no data across releases records `None`. For each boundary, record the
+  producer, the consumers, which versions can meet during rollout, and the
+  `Local check`: how to exercise both sides together locally, such as a local
+  run in which one side calls the other.
+- Find the local check in the contracts document, the component guides, and
+  the local stack setup. When they do not describe one, ask the user rather
+  than guess. Write `None` only when you confirm that the two sides cannot run
+  together locally.
 - Propose the `Quality weighting` paragraph from what the product is and the
   starting points in the
   [software quality characteristics](../../references/software-quality-characteristics.md).
   Mark it proposed until the user confirms it.
 
-## 7. Write the profile
+## 8. Write the profile
 
 - Create a missing profile file from the matching template in this skill's
-  `templates/` directory, then fill it. Update an existing file in place,
-  keeping its structure where it already covers the same settings.
+  `templates/` directory, then fill it.
+- Update an existing file in place, but compare it with its template first.
+  Skills and their scripts look up settings by the row names and table
+  columns the templates use, so a skill treats a row under another name as
+  missing. Look for:
+  - a row name that differs, such as `Repository` where the template has
+    `Default repository`;
+  - a setting folded into another row, such as statuses listed in the
+    `Status field` row instead of a `Lifecycle statuses` row;
+  - a table that lacks a template column, such as a routing table without
+    `Repository` and `Local path`.
+
+  Propose the renames and additions as a diff, and apply it only after the
+  user approves. Keep every value the user wrote, and keep sections the
+  template does not have.
 - Keep the profile a configuration record, not a copy of the documentation.
   Link the architecture, contracts, and testing guides rather than restating
   them.
 - Keep each prose paragraph, bullet, and table row on one source line.
 - Apply `technical-writing` and `unslop`.
 
-## 8. Tailor AGENTS.md and CLAUDE.md
+## 9. Tailor AGENTS.md and CLAUDE.md
 
 `AGENTS.md` is what every coding agent reads first, on every task, so it holds
 only instructions that are always relevant. Detailed facts stay in the profile
@@ -211,31 +286,33 @@ Check `CLAUDE.md` when Claude Code is one of the installed tools. It must import
 instructions that `AGENTS.md` also holds, propose moving them into `AGENTS.md`
 so the two cannot drift, as a diff for approval.
 
-## 9. Confirm with the user
+## 10. Confirm with the user
 
 Present a compact summary:
 
 - the topology and the routing table;
 - the tracker, board, lifecycle mapping, iteration field, time zone, base
   branch, fallback repository, and cross-component rule;
-- per component: platform, test harness, and commands, marking which are
-  documented only;
+- every fact harvested from the project's earlier skills and docs, marked
+  moved, already covered, or dropped with a reason;
+- per component: platform, test harness, commands, marking which are
+  documented only, and what a merge or release deploys;
 - protected files by name, and the services that need approval;
-- knowledge documents found, gaps, boundaries, and the proposed quality
-  weighting;
+- knowledge documents found, gaps, boundaries with their local checks, and the
+  proposed quality weighting;
 - what `AGENTS.md` now says about the project's intent, source of truth, and
   rules, and the source of each statement;
 - every remaining `TODO`, in the profile or in `AGENTS.md`, and the question
   that would resolve it;
-- proposed changes outside the profile and the installer's placeholders, such
-  as deny rules or additions to a hand-written `AGENTS.md`, as diffs awaiting
-  approval.
+- proposed changes that need approval, such as renamed rows and columns in an
+  existing profile file, deny rules, or additions to a hand-written
+  `AGENTS.md`, as diffs awaiting approval.
 
 Ask the user to confirm or correct the judgement calls: routing ownership,
 fallback repository, quality weighting, the project intent, and anything
 marked proposed. Apply the corrections.
 
-## 10. Check the installation
+## 11. Check the installation
 
 Run `node .agents/scripts/check-skills.mjs` from the project root when it
 exists, and report the result. Recommend a smoke test in each coding agent the
