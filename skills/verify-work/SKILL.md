@@ -111,8 +111,10 @@ and required. Use `Not verified` when the missing part could not be exercised.
 
 For every behaviour change, capture direct local runtime evidence on the
 platform that runs it. Follow the runtime-evidence section of the component's
-platform guide, using the local run command and runtime-evidence method in
-`docs/agents/verification.md`. Across every platform:
+platform guide, using the local run command and the `Runtime evidence` row in
+`docs/agents/verification.md`. That row may list one method per surface, such
+as pages, a public API, and a script embedded by other sites. Gather evidence
+on every surface the change touches. Across every platform:
 
 1. Start or reuse the local services with the documented commands. Check the
    health of a running service before starting a duplicate.
@@ -166,7 +168,10 @@ boundary between parts that ship or version separately, as listed in
 `docs/agents/domain.md` or found in the code.
 
 Verify every affected component and repository independently, then exercise the
-smallest available compatibility path across the shared boundary. Record:
+smallest available compatibility path across the shared boundary. Start from
+the boundary's `Local check` in the `Boundaries` table of
+`docs/agents/domain.md`, which records how to run both sides together locally.
+Record:
 
 - the producer and consumer, and which versions of each can meet during
   rollout, including clients already installed on users' devices;

@@ -63,9 +63,11 @@ unless the user separately and explicitly authorized that exact action.
   combinations that must keep working, the rollout and rollback order, and any
   migration, backfill, reindex, data conversion, environment variable, or
   release it needs.
-- State which steps merging does not perform, such as applying a migration to a
-  hosted database, submitting an app build, or publishing a package, and which
-  merges deploy automatically. Do not perform those steps as part of this skill.
+- State what merging triggers for each affected component, as its `Deploys`
+  row in `docs/agents/verification.md` records, such as an automatic
+  deployment. Also state which steps merging does not perform, such as applying
+  a migration to a hosted database, submitting an app build, or publishing a
+  package. Do not perform those steps as part of this skill.
 - Recommend splitting the PR when a migration, the code that uses it, and a
   later cleanup cannot safely ship together.
 

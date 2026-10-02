@@ -56,10 +56,12 @@ the edit itself touches only one side.
    once nothing deployed depends on it. Version persisted formats and keep a
    reader for every version still in use. For a library, follow its versioning
    policy: a breaking change needs a major version and a migration note.
-6. Keep each intermediate state safe to deploy and to roll back. Note which
-   merges deploy automatically and which steps need an explicit action, such as
-   a remote migration, a store submission, or a package publish. Do not perform
-   those actions as part of this workflow.
+6. Keep each intermediate state safe to deploy and to roll back. Read each
+   affected component's `Deploys` row in `docs/agents/verification.md` for what
+   a merge or release triggers. Note which merges deploy automatically and which
+   steps need an explicit action, such as a remote migration, a store
+   submission, or a package publish. Do not perform those actions as part of
+   this workflow.
 
 ## Implement and verify each side
 
@@ -71,9 +73,12 @@ the edit itself touches only one side.
    reference, changelog, or format notes. Do not use agent files as the only
    technical specification.
 9. Verify each side with its commands in `docs/agents/verification.md`. Then run
-   the smallest local check across the boundary: an old payload fixture against
-   the new consumer, an old save file loaded by the new build, or the previous
-   client against the new local server. Do not infer compatibility from two
+   the smallest local check across the boundary, starting from the boundary's
+   `Local check` in the `Boundaries` table of `docs/agents/domain.md`, such as
+   a local run where one side calls the other. Cover the version combinations
+   that run does not reach with an old payload fixture against the new
+   consumer, an old save file loaded by the new build, or the previous client
+   against the new local server. Do not infer compatibility from two
    independently green suites. Mark a combination that cannot run locally
    `Not verified` and name the missing environment or artifact.
 

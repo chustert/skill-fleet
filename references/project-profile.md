@@ -41,8 +41,8 @@ repository keeps its own Git history.
 | `AGENTS.md` | project, except one section | Always-relevant instructions, working rules, and safety rules. The profile does not restate it. The fleet installer creates it when missing and maintains only the section between the `skill-fleet:begin` and `skill-fleet:end` markers. |
 | `CLAUDE.md` | project, except one section | Imports `AGENTS.md` for Claude Code with `@AGENTS.md`. The installer creates it, or adds the import, when Claude Code is an installed tool. |
 | `docs/agents/issue-tracker.md` | project | Tracker settings, the project board and its lifecycle statuses, branch conventions, and the routing table that maps each component to its repository, local path, and responsibilities. The installer creates it with every setting it reads from GitHub; `setup-project` adds the routing and labels. |
-| `docs/agents/domain.md` | project | The knowledge reading order, glossary, architecture, contracts document, known boundaries, ADR location, and the project's quality weighting. |
-| `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence, and prerequisites. Also the online and paid services that need approval, protected files, and review-worktree setup. |
+| `docs/agents/domain.md` | project | The knowledge reading order, glossary, architecture, contracts document, known boundaries and how to check each one locally, ADR location, and the project's quality weighting. |
+| `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence for each surface, prerequisites, and what a merge or release deploys. Also the online and paid services that need approval, protected files, and review-worktree setup. |
 | `.agents/references/` | fleet | Shared models every project uses: this file, the software-quality characteristics, the GitHub reference rules, and the platform guides. Change them in the fleet and reinstall; do not edit them in a project. |
 
 The templates for the three profile files and for a new `AGENTS.md` live in
