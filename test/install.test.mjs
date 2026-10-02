@@ -187,11 +187,14 @@ describe("install", () => {
     await install();
     write(project, ".agents/skills/sprint-status/scripts/old-collector.mjs", "// left over\n");
     write(project, ".agents/skills/house-notes/notes.md", "Notes.\n");
+    write(project, ".agents/skills/house-style/SKILL.md", "---\nname: house-style\ndescription: The project's own skill.\n---\n\nBody.\n");
     const { code, output } = await run(["update", project, "--yes"]);
     assert.equal(code, 0, output);
-    assert.match(output, /the fleet does not manage these paths in \.agents\/skills\/:\n {2}\.agents\/skills\/house-notes\/\n {2}\.agents\/skills\/sprint-status\/scripts\/old-collector\.mjs\n/);
-    assert.match(output, /left over from an earlier copy of the fleet\. A project's own skill can stay\./);
+    assert.match(output, /the fleet does not manage these paths in \.agents\/skills\/:\n {2}\.agents\/skills\/house-notes\/\n {2}\.agents\/skills\/house-style\/\n {2}\.agents\/skills\/sprint-status\/scripts\/old-collector\.mjs\n/);
+    assert.match(output, /A path left over from an earlier copy of the fleet can be deleted\. A project's own skill can stay\./);
+    assert.doesNotMatch(output, /found problems/);
     assert.ok(exists(project, ".agents/skills/sprint-status/scripts/old-collector.mjs"));
+    assert.equal(exists(project, ".claude/skills/house-style"), false);
   });
 
   test("refuses to run over an installation by a newer version, unless forced", async () => {
@@ -202,12 +205,14 @@ describe("install", () => {
     const manifest = JSON.parse(read(project, checks.MANIFEST));
     fs.writeFileSync(path.join(project, checks.MANIFEST), JSON.stringify({ ...manifest, version: newer }));
     const recorded = read(project, checks.MANIFEST);
-    for (const command of ["install", "update"]) {
+    for (const [command, argv, cwd] of [["install", [project], dir], ["update", [], project]]) {
       const github = new FakeGitHub();
-      const { code, output } = await run([command, project, "--yes"], { github });
+      const { code, output } = await run([command, ...argv, "--yes"], { github, cwd });
       assert.equal(code, 1, output);
       assert.ok(output.includes(`installed with skill-fleet ${newer}, which is newer than this skill-fleet ${version()}`));
-      assert.ok(output.includes(`Run npx skill-fleet@${newer} ${command}, or npx skill-fleet@latest ${command} once ${newer} is published`));
+      const again = [command, ...argv].join(" ");
+      assert.ok(output.includes(`Run npx skill-fleet@${newer} ${again}, or npx skill-fleet@latest ${again} once ${newer} is published`),
+        output);
       assert.deepEqual(github.calls, []);
     }
     assert.equal(read(project, checks.MANIFEST), recorded);
@@ -226,21 +231,45 @@ describe("install", () => {
   });
 
   test("next steps name the profile settings the templates have and the project lacks", async () => {
+    // verification.md: a second component section that lacks a row the template has.
+    const verification = template("verification.md").replaceAll("TODO", "Filled");
     const [settings] = markdownTables(template("verification.md")).filter((t) => t.header[0] === "Setting");
     const setting = settings.rows[1][0];
-    write(project, "docs/agents/verification.md", template("verification.md").replaceAll("TODO", "Filled")
-      .split("\n").filter((line) => !line.startsWith(`| ${setting} |`)).join("\n"));
+    const first = verification.slice(verification.indexOf("### "), verification.indexOf("\n## ", verification.indexOf("### ")));
+    const second = first.replace(/^### .*$/m, "### Worker (`worker/`)").split("\n")
+      .filter((line) => !line.startsWith(`| ${setting} |`)).join("\n");
+    write(project, "docs/agents/verification.md", verification.replace(first, `${first}\n${second}`));
+    // domain.md: a boundaries table without the template's last column.
     const boundaries = markdownTables(template("domain.md")).find((t) => t.section === "Boundaries");
     const column = boundaries.header.at(-1);
     write(project, "docs/agents/domain.md", template("domain.md").replaceAll("TODO", "Filled").split("\n")
       .map((line) => (line.startsWith(`| ${boundaries.header[0]} |`) ? `| ${boundaries.header.slice(0, -1).join(" | ")} |` : line))
       .join("\n"));
-    write(project, "docs/agents/issue-tracker.md", template("issue-tracker.md").replaceAll("TODO", "Filled"));
+    // issue-tracker.md: no Labels row, and a routing table with only its first and last columns.
+    const routing = markdownTables(template("issue-tracker.md")).find((t) => t.section === "Routing").header;
+    write(project, "docs/agents/issue-tracker.md", template("issue-tracker.md").replaceAll("TODO", "Filled").split("\n")
+      .filter((line) => !line.startsWith("| Labels |"))
+      .map((line) => (line.startsWith(`| ${routing[0]} |`) ? `| ${routing[0]} | ${routing.at(-1)} |` : line))
+      .join("\n"));
     const { code, output } = await install();
     assert.equal(code, 0, output);
-    assert.ok(output.includes(`  - add the settings missing from docs/agents/verification.md: ${setting}\n`), output);
-    assert.ok(output.includes(`  - add the settings missing from docs/agents/domain.md: ${column}\n`), output);
-    assert.doesNotMatch(output, /missing from docs\/agents\/issue-tracker\.md/);
+    assert.ok(output.includes(
+      `  - add the settings missing from docs/agents/verification.md: the ${setting} row under Worker (\`worker/\`)\n`), output);
+    assert.ok(output.includes(
+      `  - add the settings missing from docs/agents/domain.md: the Boundaries table's ${column} column\n`), output);
+    assert.ok(output.includes("  - add the settings missing from docs/agents/issue-tracker.md: the Labels row; "
+      + `the Routing table's ${routing[1]} and ${routing[2]} columns\n`), output);
+    // A domain.md without a Boundaries section is asked for the whole table, and one that records None is not.
+    const domain = read(project, "docs/agents/domain.md");
+    write(project, "docs/agents/domain.md", domain.replace(/^## Boundaries\n[\s\S]*?(?=^## )/m, ""));
+    const without = await run(["update", project, "--yes"]);
+    assert.equal(without.code, 0, without.output);
+    assert.ok(without.output.includes("  - add the settings missing from docs/agents/domain.md: the Boundaries table\n"),
+      without.output);
+    write(project, "docs/agents/domain.md", domain.replace(/^## Boundaries\n[\s\S]*?(?=^## )/m, "## Boundaries\n\nNone.\n\n"));
+    const none = await run(["update", project, "--yes"]);
+    assert.equal(none.code, 0, none.output);
+    assert.doesNotMatch(none.output, /missing from docs\/agents\/domain\.md/);
   });
 
   test("update stops when nothing is installed", async () => {
@@ -309,6 +338,7 @@ describe("AGENTS.md and CLAUDE.md", () => {
     assert.match(block, /ask the user to run `npx skill-fleet@latest update`, which creates or repairs it\. /);
     assert.match(block, /changes the project board on GitHub, so it runs only with the user's approval, after `--dry-run`/);
     assert.match(block, /Do not edit by hand the files that `\.agents\/skill-fleet\.json` records/);
+    assert.match(block, /The update can also change the project board, so it runs only with the user's approval, after `--dry-run`\./);
     assert.match(output, /fill the TODOs in AGENTS\.md/);
     assert.equal(checks.findBlock(read(project, "CLAUDE.md")), "@AGENTS.md\n");
     assert.deepEqual(checks.check(project), []);
@@ -512,12 +542,14 @@ describe("GitHub setup", () => {
     const created = await install(github);
     assert.equal(created.code, 1);
     assert.match(created.output, /makes them only with your consent:\n {2}- create the project board "space-game Sprints" owned by acme/);
-    assert.match(created.output, /Nothing was written, on GitHub or on disk\. Rerun in a terminal to be asked first, or rerun with --yes/);
+    assert.ok(created.output.includes("Nothing was written, on GitHub or on disk. To go on, rerun in a terminal to be "
+      + "asked first, rerun with --yes to make the changes, or name an existing board with --board <number or title>.\n"));
     const repair = new FakeGitHub();
     repair.addBoard({ title: "Roadmap", linkedTo: "acme/space-game" });
     const repaired = await install(repair);
     assert.equal(repaired.code, 1);
     assert.match(repaired.output, /- add In review to the Status field on "Roadmap"/);
+    assert.match(repaired.output, /To go on, rerun in a terminal to be asked first, or rerun with --yes to make the changes\.\n/);
     const named = new FakeGitHub();
     named.addBoard({ title: "Team board" });
     const linked = await install(named, {}, "--board", "Team board");
@@ -544,7 +576,7 @@ describe("GitHub setup", () => {
     assert.equal(declined.code, 1);
     assert.ok(declined.asked.some((q) => q.startsWith(
       'No project board is linked to acme/space-game. Create the project board "space-game Sprints"')));
-    assert.match(declined.output, /needs a project board\. Nothing was written/);
+    assert.match(declined.output, /needs a project board\. Nothing was written\. To use a board of your own, create or reopen it on GitHub/);
     assert.equal(github.mutations().length, 0);
     assert.deepEqual(fs.readdirSync(project), [".git"]);
     const accepted = await install(github, { interactive: true });
@@ -707,28 +739,34 @@ describe("check and list", () => {
 
   test("check notes paths the fleet does not manage, without changing its result", async () => {
     write(project, ".agents/skills/tdd/scripts/old-helper.mjs", "// left over\n");
-    const own = "---\nname: house-style\ndescription: The project's own skill.\n---\n\nBody.\n";
-    write(project, ".agents/skills/house-style/SKILL.md", own);
-    for (const tool of ["claude", "cursor"]) {
-      const { dir: folder, fields } = checks.HARNESSES[tool];
-      write(project, `${folder}/house-style/SKILL.md`, checks.adapterText("house-style", own, fields));
-    }
+    write(project, ".agents/skills/house-style/SKILL.md", "---\nname: house-style\ndescription: The project's own skill.\n---\n\nBody.\n");
     assert.deepEqual(checks.check(project), []);
     assert.deepEqual(checks.unmanaged(project), [".agents/skills/house-style/", ".agents/skills/tdd/scripts/old-helper.mjs"]);
     const passed = await run(["check", project]);
     assert.equal(passed.code, 0, passed.output);
     assert.match(passed.output, /^Note: the fleet does not manage these paths in \.agents\/skills\/:$/m);
     assert.match(passed.output, /^ {2}\.agents\/skills\/house-style\/$/m);
-    assert.match(passed.output, /^Delete a path that is left over from an earlier copy of the fleet\. A project's own skill can stay\.$/m);
+    assert.match(passed.output, /^A path left over from an earlier copy of the fleet can be deleted\. A project's own skill can stay\.$/m);
     const standalone = spawnSync(process.execPath, [path.join(project, ".agents/scripts/check-skills.mjs")],
       { encoding: "utf8" });
     assert.equal(standalone.status, 0, standalone.stderr);
     assert.match(standalone.stdout, /^ {2}\.agents\/skills\/tdd\/scripts\/old-helper\.mjs$/m);
-    fs.unlinkSync(path.join(project, ".cursor/skills/house-style/SKILL.md"));
+    fs.unlinkSync(path.join(project, ".cursor/skills/tdd/SKILL.md"));
     const failed = await run(["check", project]);
     assert.equal(failed.code, 1);
     assert.match(failed.output, /does not manage these paths/);
-    assert.match(failed.output, /missing cursor adapter for house-style/);
+    assert.match(failed.output, /missing cursor adapter for tdd/);
+  });
+
+  test("a project's own skill may have adapters of its own, in any form", () => {
+    write(project, ".agents/skills/house-style/SKILL.md", "---\nname: house-style\ndescription: The project's own skill.\n---\n\nBody.\n");
+    write(project, ".claude/skills/house-style/SKILL.md", "---\nname: house-style\n---\n\nRead the canonical skill.\n");
+    write(project, ".claude/skills/house-style/notes.md", "Notes.\n");
+    assert.deepEqual(checks.check(project), []);
+    fs.unlinkSync(path.join(project, checks.MANIFEST));
+    // Without a manifest, every skill is checked as the fleet's.
+    assert.ok(checks.check(project).includes("claude adapter for house-style differs from the canonical skill"));
+    assert.ok(checks.check(project).includes("missing cursor adapter for house-style"));
   });
 
   test("adapter drift is reported", () => {
@@ -820,17 +858,35 @@ describe("versions and profile settings", () => {
     ].join("\n");
     const partial = "| Setting | Value |\n| --- | --- |\n| **Platform** | `web` |\n\n"
       + "| Boundary | Producer |\n| --- | --- |\n| API | web |\n";
-    assert.deepEqual(missingSettings(templateText, partial), ["Deploys", "Local check"]);
-    const complete = "| Setting | Value |\n| --- | --- |\n| Platform | web |\n| Deploys | None |\n\nBoundaries: None.\n";
-    assert.deepEqual(missingSettings(templateText, complete), []);
+    assert.deepEqual(missingSettings(templateText, partial), {
+      rows: [{ name: "Deploys", component: null }],
+      columns: [{ table: "Boundaries", name: "Local check" }],
+      tables: [],
+    });
+    const settings = "| Setting | Value |\n| --- | --- |\n| Platform | web |\n| Deploys | None |\n";
+    assert.deepEqual(missingSettings(templateText, `${settings}\n## Boundaries\n\nNone.\n`), { rows: [], columns: [], tables: [] });
+    assert.deepEqual(missingSettings(templateText, settings), { rows: [], columns: [], tables: ["Boundaries"] });
+  });
+
+  test("a repeated component section is checked in each copy", () => {
+    const table = "| Setting | Value |\n| --- | --- |\n";
+    const templateText = `## Components\n\n### TODO component (\`path/\`)\n\n${table}| Platform | TODO |\n| Deploys | TODO |\n`;
+    const text = `## Components\n\n### Web (\`web/\`)\n\n${table}| Platform | web |\n| Deploys | None |\n\n`
+      + `### Worker (\`worker/\`)\n\n${table}| Platform | service |\n\n## Local stack\n\nNone.\n`;
+    assert.deepEqual(missingSettings(templateText, text).rows, [{ name: "Deploys", component: "Worker (`worker/`)" }]);
+    // Without component sections, the file as a whole counts.
+    assert.deepEqual(missingSettings(templateText, `${table}| Platform | web |\n`).rows, [{ name: "Deploys", component: null }]);
   });
 
   test("the templates yield the settings to look for, and lack none of them", () => {
-    assert.ok(missingSettings(template("issue-tracker.md"), "").includes("Default repository"));
-    assert.ok(missingSettings(template("verification.md"), "").includes("Platform"));
-    assert.ok(missingSettings(template("domain.md"), "| Boundary |\n| --- |\n").includes("Producer"));
+    const rows = (missing) => missing.rows.map((row) => row.name);
+    assert.ok(rows(missingSettings(template("issue-tracker.md"), "")).includes("Default repository"));
+    assert.ok(rows(missingSettings(template("verification.md"), "")).includes("Platform"));
+    const boundary = missingSettings(template("domain.md"), "| Boundary |\n| --- |\n");
+    assert.ok(boundary.columns.some((column) => column.name === "Producer"));
+    assert.deepEqual(missingSettings(template("domain.md"), "# Domain\n").tables, ["Boundaries"]);
     for (const name of ["issue-tracker.md", "domain.md", "verification.md"]) {
-      assert.deepEqual(missingSettings(template(name), template(name)), [], name);
+      assert.deepEqual(missingSettings(template(name), template(name)), { rows: [], columns: [], tables: [] }, name);
     }
   });
 });
