@@ -6,10 +6,11 @@
  * whatever account `gh auth status` reports. Board queries need the
  * `read:project` scope.
  *
- * Nothing here names a project. The skill reads the owner, board, field names,
- * and lifecycle statuses from the project's docs/agents/issue-tracker.md and
- * passes them as flags. The owner can be an organization or a user; the script
- * detects which. Only Node's standard library is used.
+ * Nothing here names a project. The skill reads the owner, board, repositories,
+ * field names, and lifecycle statuses from the project's
+ * docs/agents/issue-tracker.md and passes them as flags. The owner can be an
+ * organization or a user; the script detects which. Only Node's standard
+ * library is used.
  */
 
 import { spawnSync } from "node:child_process";
@@ -166,14 +167,24 @@ export function localToday() {
 }
 
 const USAGE = `Usage: node sprint-data.mjs --owner <owner> --project <number or exact title>
-  [--repo <owner/repo> ...] [--status-field <name>] [--iteration-field <name>]
-  [--todo-status <name>] [--started-status <name>] [--review-status <name>]
-  [--done-status <name>] [--date YYYY-MM-DD]
+  (--repo <owner/repo> ... | --all-repos) [--status-field <name>]
+  [--iteration-field <name>] [--todo-status <name>] [--started-status <name>]
+  [--review-status <name>] [--done-status <name>] [--date YYYY-MM-DD]
 
-The project is the board named in docs/agents/issue-tracker.md. Omit --repo to
-cover every repository the owner has.`;
+The project is the board named in docs/agents/issue-tracker.md. Pass --repo for
+each repository in its routing table. --all-repos covers every repository the
+owner has instead.`;
 export const REPAIR = "Ask the user to run npx skill-fleet@latest update, which creates or repairs the board. "
   + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with --dry-run.";
+export const SCOPE_REQUIRED = "Pass --repo <owner/repo> for each repository to cover, or --all-repos to cover "
+  + "every repository the owner has.";
+
+/** The repositories a command covers: the listed ones, or all of the owner's with --all-repos. */
+export function repoScope(repos, allRepos, usage) {
+  if (repos.length && allRepos) throw new UsageError(`Pass either --repo or --all-repos, not both.\n\n${usage}`);
+  if (!repos.length && !allRepos) throw new UsageError(`${SCOPE_REQUIRED}\n\n${usage}`);
+  return { repos, allRepos };
+}
 
 export function parseArgs(argv) {
   let values;
@@ -184,6 +195,7 @@ export function parseArgs(argv) {
         owner: { type: "string" },
         project: { type: "string" },
         repo: { type: "string", multiple: true, default: [] },
+        "all-repos": { type: "boolean", default: false },
         "status-field": { type: "string", default: "Status" },
         "iteration-field": { type: "string" },
         "todo-status": { type: "string", default: "Todo" },
@@ -203,7 +215,7 @@ export function parseArgs(argv) {
   return {
     owner: values.owner,
     project: values.project,
-    repos: values.repo,
+    ...repoScope(values.repo, values["all-repos"], USAGE),
     statusField: values["status-field"],
     iterationField: values["iteration-field"] ?? null,
     names: {
@@ -392,14 +404,16 @@ export function classify(items, me, names, sprintTitle) {
   };
 }
 
-/** Limit a `gh search` call to the listed repositories, or the whole owner. */
-export function scopeFlags(owner, repos) {
-  return repos.length ? repos.map((r) => `--repo=${r}`) : [`--owner=${owner}`];
+/** Limit a `gh search` call to the listed repositories, or to the whole owner with allRepos. */
+export function scopeFlags(owner, repos, allRepos = false) {
+  if (repos.length) return repos.map((r) => `--repo=${r}`);
+  if (allRepos) return [`--owner=${owner}`];
+  throw new UsageError(SCOPE_REQUIRED);
 }
 
-function prRows(queryArgs, owner, repos) {
-  const out = gh(["search", "prs", ...queryArgs, ...scopeFlags(owner, repos), "--state=open", "--limit=40",
-    "--json", "repository,number,title,url,createdAt,updatedAt,isDraft"]);
+function prRows(queryArgs, args) {
+  const out = gh(["search", "prs", ...queryArgs, ...scopeFlags(args.owner, args.repos, args.allRepos), "--state=open",
+    "--limit=40", "--json", "repository,number,title,url,createdAt,updatedAt,isDraft"]);
   return JSON.parse(out || "[]");
 }
 
@@ -462,9 +476,9 @@ export function collect(args) {
     ...classify(items, me, args.names, current?.title ?? null),
   });
 
-  const reviewsForMe = prRows([`--review-requested=${me}`], args.owner, args.repos);
-  const mentions = prRows([`--mentions=${me}`], args.owner, args.repos);
-  const authored = prRows([`--author=${me}`], args.owner, args.repos);
+  const reviewsForMe = prRows([`--review-requested=${me}`], args);
+  const mentions = prRows([`--mentions=${me}`], args);
+  const authored = prRows([`--author=${me}`], args);
   for (const row of [...reviewsForMe, ...authored]) row.detail = prDetail(row.repository.nameWithOwner, row.number);
   const seen = new Set([...reviewsForMe, ...authored].map((r) => r.url));
   result.prs = {

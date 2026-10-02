@@ -152,11 +152,12 @@ export function metrics(activity) {
   };
 }
 
-/** Search qualifier for the listed repositories, or everything the owner has. */
-export function scopeQualifier(owner, ownerType, repos) {
+/** Search qualifier for the listed repositories, or everything the owner has with allRepos. */
+export function scopeQualifier(owner, ownerType, repos, allRepos = false) {
   // Several repo: qualifiers in one query match any of them.
   if (repos.length) return repos.map((r) => `repo:${r}`).join(" ");
-  return `${ownerType === "organization" ? "org" : "user"}:${owner}`;
+  if (allRepos) return `${ownerType === "organization" ? "org" : "user"}:${owner}`;
+  throw new UsageError(sprintData.SCOPE_REQUIRED);
 }
 
 export function collect(me, start, end, scope) {
@@ -213,8 +214,13 @@ export function collect(me, start, end, scope) {
 }
 
 const USAGE = `Usage: node sprint-recap.mjs --owner <owner> [--project <number or exact title>]
-  [--iteration-field <name>] [--repo <owner/repo> ...] [--timezone <IANA zone>]
+  (--repo <owner/repo> ... | --all-repos) [--timezone <IANA zone>]
+  [--iteration-field <name>]
   [--date YYYY-MM-DD | --since YYYY-MM-DD [--until YYYY-MM-DD]]
+
+Pass --repo for each repository in the routing table of
+docs/agents/issue-tracker.md. --all-repos covers every repository the owner has
+instead.
 
 --date selects the sprint containing that date. --since and --until select an
 explicit window instead, such as a month or a quarter.`;
@@ -229,6 +235,7 @@ export function parseArgs(argv) {
         project: { type: "string" },
         "iteration-field": { type: "string" },
         repo: { type: "string", multiple: true, default: [] },
+        "all-repos": { type: "boolean", default: false },
         date: { type: "string" },
         since: { type: "string" },
         until: { type: "string" },
@@ -252,7 +259,7 @@ export function parseArgs(argv) {
     owner: values.owner,
     project: values.project ?? null,
     iterationField: values["iteration-field"] ?? null,
-    repos: values.repo,
+    ...sprintData.repoScope(values.repo, values["all-repos"], USAGE),
     date: values.date ? isoDate(values.date, "--date") : null,
     since: values.since ? isoDate(values.since, "--since") : null,
     until: values.until ? isoDate(values.until, "--until") : null,
@@ -290,7 +297,7 @@ export function main(argv) {
   const now = new Date();
   const [board, period, start, end] = selectPeriod(args, now);
   const me = deps.api("user").login;
-  const scope = scopeQualifier(args.owner, sprintData.ownerRoot(args.owner), args.repos);
+  const scope = scopeQualifier(args.owner, sprintData.ownerRoot(args.owner), args.repos, args.allRepos);
   const [activity, queries] = collect(me, start, end, scope);
   const repositories = [...new Set(Object.values(activity).flatMap((rows) => rows.map((r) => r.repo)))].sort();
   const result = {

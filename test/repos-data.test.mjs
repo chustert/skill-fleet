@@ -227,6 +227,7 @@ describe("arguments", () => {
  */
 describe("a clone with branches in every state", () => {
   const realGh = sd.io.gh;
+  const ghCalls = [];
   let dir;
   let app;
   let shas;
@@ -351,7 +352,10 @@ describe("a clone with branches in every state", () => {
     git(seed, ["push", "-q", url, "main"]);
 
     sd.clearCaches();
-    sd.io.gh = fakeGh;
+    sd.io.gh = (args) => {
+      ghCalls.push(args);
+      return fakeGh(args);
+    };
   });
 
   after(() => {
@@ -424,6 +428,16 @@ describe("a clone with branches in every state", () => {
     assert.ok(out.includes("| 🔵 | not checked out | `feature/6-other` | [app#6](https://github.com/acme/app/pull/6) open "
       + "| 2026-09-28 · other | — |"));
     assert.ok(out.includes("| ⚪ | no worktree | 1 merged or empty branch | — | — | safe to delete |"));
+  });
+
+  test("the issue map reads the board and searches no owner's repositories", () => {
+    ghCalls.length = 0;
+    const args = rd.parseArgs(["--owner", "acme", "--project", "app Sprints", "--path", "app", "--no-fetch",
+      "--date", TODAY]);
+    assert.equal(rd.collect(args, dir).sprint.issues.length, 4);
+    assert.ok(ghCalls.some((call) => call.join(" ").includes("items(first")));
+    assert.deepEqual(ghCalls.filter((call) => call[0] === "search" || call.some((arg) => arg.startsWith("--owner="))),
+      []);
   });
 
   test("a board problem leaves the branch report and asks for the update with approval", () => {

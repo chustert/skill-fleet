@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
 import * as recap from "../skills/sprint-recap/scripts/sprint-recap.mjs";
 
@@ -119,9 +119,55 @@ describe("scope", () => {
     for (const query of queries) assert.ok(query.startsWith("repo:acme/web repo:acme/app "));
   });
 
-  test("the owner type selects the org or user qualifier", () => {
-    assert.equal(recap.scopeQualifier("acme", "organization", []), "org:acme");
-    assert.equal(recap.scopeQualifier("someone", "user", []), "user:someone");
+  test("the owner type selects the org or user qualifier, only with --all-repos", () => {
+    assert.equal(recap.scopeQualifier("acme", "organization", [], true), "org:acme");
+    assert.equal(recap.scopeQualifier("someone", "user", [], true), "user:someone");
+    assert.throws(() => recap.scopeQualifier("acme", "organization", []), sd.UsageError);
+  });
+
+  test("a repository or --all-repos is required, not both", () => {
+    const window = ["--owner", "acme", "--since", "2026-09-01"];
+    assert.throws(() => recap.parseArgs(window), /--repo <owner\/repo>.*--all-repos/);
+    assert.throws(() => recap.parseArgs([...window, "--repo", "acme/app", "--all-repos"]),
+      /either --repo or --all-repos, not both/);
+    const all = recap.parseArgs([...window, "--all-repos"]);
+    assert.deepEqual([all.repos, all.allRepos], [[], true]);
+    assert.deepEqual(recap.parseArgs([...window, "--repo", "acme/app"]).repos, ["acme/app"]);
+  });
+});
+
+describe("collection", () => {
+  const realGh = sd.io.gh;
+  const ARGS = ["--owner", "acme", "--since", "2025-01-06", "--until", "2025-01-12"];
+  let queries;
+
+  beforeEach(() => {
+    sd.clearCaches();
+    sd.io.gh = () => JSON.stringify({ data: { repositoryOwner: { __typename: "Organization", login: "acme" } } });
+    queries = [];
+    recap.deps.api = () => ({ login: "me" });
+    recap.deps.search = (query) => {
+      queries.push(query);
+      return [];
+    };
+  });
+  afterEach(() => {
+    sd.io.gh = realGh;
+    sd.clearCaches();
+  });
+
+  const run = (...extra) => JSON.parse(recap.main([...ARGS, ...extra]));
+
+  test("searches cover the listed repositories, or the owner with --all-repos", () => {
+    assert.equal(run("--repo", "acme/app", "--timezone", "UTC").scope,
+      "acme/app, regardless of board membership");
+    assert.equal(queries.length, 4);
+    for (const query of queries) assert.ok(query.startsWith("repo:acme/app "), query);
+    queries = [];
+    assert.equal(run("--all-repos", "--timezone", "UTC").scope,
+      "Accessible acme repositories, regardless of board membership");
+    assert.equal(queries.length, 4);
+    for (const query of queries) assert.ok(query.startsWith("org:acme "), query);
   });
 });
 
@@ -129,7 +175,8 @@ describe("periods", () => {
   const NOW = new Date("2026-09-26T10:00:00Z");
 
   test("an explicit window needs no board", () => {
-    const args = recap.parseArgs(["--owner", "acme", "--since", "2026-09-01", "--until", "2026-09-07"]);
+    const args = recap.parseArgs(["--owner", "acme", "--repo", "acme/app", "--since", "2026-09-01",
+      "--until", "2026-09-07"]);
     const [board, period, start, end] = recap.selectPeriod(args, NOW);
     assert.equal(board, null);
     assert.equal(period.title, "Custom window");
@@ -142,12 +189,13 @@ describe("periods", () => {
     assert.throws(() => recap.parseArgs(["--owner", "acme", "--project", "B", "--since", "2026-09-01",
       "--date", "2026-09-02"]), sd.UsageError);
     assert.throws(() => recap.parseArgs(["--owner", "acme", "--until", "2026-09-02"]), sd.UsageError);
-    assert.throws(() => recap.parseArgs(["--owner", "acme", "--since", "2026-09-01", "--timezone", "Mars/Base"]),
-      sd.UsageError);
+    assert.throws(() => recap.parseArgs(["--owner", "acme", "--repo", "acme/app", "--since", "2026-09-01",
+      "--timezone", "Mars/Base"]), /Unknown time zone "Mars\/Base"/);
   });
 
   test("a window without --until ends today in the time zone", () => {
-    const args = recap.parseArgs(["--owner", "acme", "--since", "2026-09-10", "--timezone", "Europe/Berlin"]);
+    const args = recap.parseArgs(["--owner", "acme", "--repo", "acme/app", "--since", "2026-09-10",
+      "--timezone", "Europe/Berlin"]);
     const [, period, start] = recap.selectPeriod(args, NOW);
     assert.equal(period.end, "2026-09-26");
     assert.equal(recap.iso(start), "2026-09-09T22:00:00Z");
@@ -155,8 +203,8 @@ describe("periods", () => {
 
   test("a board without iterations asks for the update or a window", () => {
     recap.deps.resolveIterations = () => [{ title: "Board", url: "u" }, null, null, []];
-    assert.throws(() => recap.selectPeriod(recap.parseArgs(["--owner", "acme", "--project", "Board"]), NOW),
-      (error) => error instanceof sd.UsageError
+    assert.throws(() => recap.selectPeriod(recap.parseArgs(["--owner", "acme", "--project", "Board",
+      "--repo", "acme/app"]), NOW), (error) => error instanceof sd.UsageError
         && error.message === `The board "Board" has no iteration field. ${sd.REPAIR} `
           + "To recap a date window instead, pass --since and --until.");
   });
@@ -164,6 +212,6 @@ describe("periods", () => {
   test("no sprint on the chosen date is an error", () => {
     recap.deps.resolveIterations = () => [{ title: "Board", url: "u" }, "Sprint", null, []];
     assert.throws(() => recap.selectPeriod(recap.parseArgs(["--owner", "acme", "--project", "Board",
-      "--date", "2026-01-01"]), NOW), /No sprint contains 2026-01-01/);
+      "--repo", "acme/app", "--date", "2026-01-01"]), NOW), /No sprint contains 2026-01-01/);
   });
 });

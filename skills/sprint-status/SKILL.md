@@ -29,12 +29,17 @@ recommend `setup-project` rather than guessing.
 | Status field | `--status-field "<name>"`, when it is not `Status` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Lifecycle statuses | `--todo-status`, `--started-status`, `--review-status`, `--done-status`, when they differ from `Todo`, `In progress`, `In review`, and `Done` |
-| Each repository in the routing table | `--repo <owner/repo>`, repeated. Omit to cover every repository the owner has. |
+| Each repository in the routing table's `Repository` column | `--repo <owner/repo>`, repeated |
+| Default repository, when the routing table has no `Repository` column | `--repo <owner/repo>`, once |
+
+The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
+`--all-repos` instead of `--repo` only when the user asks for every repository
+of the owner, or the routing table says the board tracks all of them.
 
 Run the script that ships with this skill, from the project root:
 
 ```bash
-node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" [--repo <owner/repo> ...]
+node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" --repo <owner/repo> [--repo <owner/repo> ...]
 ```
 
 The script needs Node.js 20 or later and the GitHub CLI, and nothing else.
@@ -46,8 +51,8 @@ This prints JSON and does all the GitHub work: detects whether the owner is an
 organization or a user, finds the board by its exact title, resolves which
 iteration contains today's date, filters the board to items assigned to the
 authenticated user, buckets them by lifecycle status, and pulls the PR review
-queue for the listed repositories. Pass `--date YYYY-MM-DD` to report on a
-different sprint.
+queue for the listed repositories, or for all of the owner's with
+`--all-repos`. Pass `--date YYYY-MM-DD` to report on a different sprint.
 
 If it exits asking for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project` — do not try to work around it. If it reports

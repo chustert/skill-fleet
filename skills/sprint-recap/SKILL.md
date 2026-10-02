@@ -17,20 +17,31 @@ sprint's original commitments.
 Read the tracker settings and the routing table in
 `docs/agents/issue-tracker.md`, following the
 [rules for reading the profile](../../references/project-profile.md), and map
-them to flags the same way `sprint-status` does: `--owner`, `--project`,
-`--iteration-field` when the board has several, and one `--repo` per
-repository in the routing table. Pass the sprint time zone from the tracker
-settings as `--timezone`. If a value the command needs is still `TODO`, say so
-and recommend `setup-project` rather than guessing. The board is required: if
-the settings name none, ask the user to run `npx skill-fleet@latest update`,
-which creates or repairs the board. It changes the project board on GitHub, so
-it runs only with the user's approval, after a preview with `--dry-run`. Do not
-run it yourself without that approval.
+them to flags:
+
+| Tracker setting | Flag |
+| --- | --- |
+| Project board owner | `--owner <owner>` |
+| Project board title | `--project "<exact title>"` |
+| Iteration field | `--iteration-field "<name>"`, when the board has several |
+| Sprint time zone | `--timezone <IANA zone>` |
+| Each repository in the routing table's `Repository` column | `--repo <owner/repo>`, repeated |
+| Default repository, when the routing table has no `Repository` column | `--repo <owner/repo>`, once |
+
+The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
+`--all-repos` instead of `--repo` only when the user asks for every repository
+of the owner, or the routing table says the board tracks all of them. If a
+value the command needs is still `TODO`, say so and recommend `setup-project`
+rather than guessing. The board is required: if the settings name none, ask the
+user to run `npx skill-fleet@latest update`, which creates or repairs the
+board. It changes the project board on GitHub, so it runs only with the user's
+approval, after a preview with `--dry-run`. Do not run it yourself without that
+approval.
 
 Run from the project root:
 
 ```bash
-node .agents/skills/sprint-recap/scripts/sprint-recap.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> [--repo <owner/repo> ...]
+node .agents/skills/sprint-recap/scripts/sprint-recap.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> --repo <owner/repo> [--repo <owner/repo> ...]
 ```
 
 The collector needs Node.js 20 or later and the GitHub CLI. It reuses the sibling

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, test } from "node:test";
+import { fileURLToPath } from "node:url";
 import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
 
 const NAMES = { todo: "Todo", started: "In progress", review: "In review", done: "Done" };
@@ -152,21 +154,40 @@ describe("classification", () => {
 });
 
 describe("arguments and search scope", () => {
-  test("search scope uses the repositories or the owner", () => {
+  test("search scope uses the repositories, or the whole owner only with --all-repos", () => {
     assert.deepEqual(sd.scopeFlags("acme", ["acme/a", "acme/b"]), ["--repo=acme/a", "--repo=acme/b"]);
-    assert.deepEqual(sd.scopeFlags("acme", []), ["--owner=acme"]);
+    assert.deepEqual(sd.scopeFlags("acme", [], true), ["--owner=acme"]);
+    assert.throws(() => sd.scopeFlags("acme", []), sd.UsageError);
+  });
+
+  test("a repository or --all-repos is required, not both", () => {
+    assert.throws(() => sd.parseArgs(["--owner", "acme", "--project", "Board"]), /--repo <owner\/repo>.*--all-repos/);
+    assert.throws(() => sd.parseArgs(["--owner", "acme", "--project", "Board", "--repo", "acme/a", "--all-repos"]),
+      /either --repo or --all-repos, not both/);
+    const all = sd.parseArgs(["--owner", "acme", "--project", "Board", "--all-repos"]);
+    assert.deepEqual([all.repos, all.allRepos], [[], true]);
+  });
+
+  test("the command line stops with a usage error when no scope is given", () => {
+    const script = fileURLToPath(new URL("../skills/sprint-status/scripts/sprint-data.mjs", import.meta.url));
+    const res = spawnSync(process.execPath, [script, "--owner", "acme", "--project", "Board"], { encoding: "utf8" });
+    assert.equal(res.status, 1);
+    assert.equal(res.stdout, "");
+    assert.ok(res.stderr.startsWith(`${sd.SCOPE_REQUIRED}\n\nUsage:`), res.stderr);
   });
 
   test("flags map to settings with defaults", () => {
     const args = sd.parseArgs(["--owner", "acme", "--project", "Board", "--repo", "acme/a", "--repo=acme/b",
       "--started-status", "Doing"]);
     assert.deepEqual(args.repos, ["acme/a", "acme/b"]);
+    assert.equal(args.allRepos, false);
     assert.equal(args.names.started, "Doing");
     assert.equal(args.names.todo, "Todo");
     assert.equal(args.statusField, "Status");
-    assert.throws(() => sd.parseArgs(["--project", "Board"]), sd.UsageError);
-    assert.throws(() => sd.parseArgs(["--owner", "acme"]), /--project is required/);
-    assert.throws(() => sd.parseArgs(["--owner", "a", "--project", "B", "--date", "tomorrow"]), sd.UsageError);
+    assert.throws(() => sd.parseArgs(["--project", "Board", "--repo", "acme/a"]), sd.UsageError);
+    assert.throws(() => sd.parseArgs(["--owner", "acme", "--repo", "acme/a"]), /--project is required/);
+    assert.throws(() => sd.parseArgs(["--owner", "a", "--project", "B", "--repo", "a/b", "--date", "tomorrow"]),
+      sd.UsageError);
   });
 
   test("a board problem asks the user to run the update, with approval and a dry run first", () => {
@@ -179,5 +200,63 @@ describe("arguments and search scope", () => {
   test("comment excerpts collapse whitespace and stop at 400 characters", () => {
     assert.equal(sd.excerpt(" a\n\n b\tc "), "a b c");
     assert.equal(sd.excerpt("x".repeat(500)).length, 400);
+  });
+});
+
+describe("collection", () => {
+  /** A board with one sprint and no items, and no open PRs anywhere. */
+  function board(args, { iterations = true } = {}) {
+    const joined = args.join(" ");
+    if (args[0] === "search") return [];
+    if (joined.includes("viewer")) return { data: { viewer: { login: "me" } } };
+    if (joined.includes("repositoryOwner")) return { data: { repositoryOwner: { __typename: "User", login: "acme" } } };
+    if (joined.includes("projectsV2(first")) {
+      return { data: { user: { projectsV2: { nodes: [{ number: 1, title: "Board", url: "u", closed: false }] } } } };
+    }
+    if (joined.includes("ProjectV2IterationField")) {
+      const nodes = iterations ? [{ name: "Sprint", configuration: {
+        iterations: [{ title: "S2", startDate: "2026-09-21", duration: 14 }], completedIterations: [] } }] : [];
+      return { data: { user: { projectV2: { fields: { nodes } } } } };
+    }
+    if (joined.includes("items(first")) {
+      return { data: { user: { projectV2: { items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } } };
+    }
+    throw new Error(`unexpected gh ${joined}`);
+  }
+
+  const searches = (calls) => calls.filter((args) => args[0] === "search");
+  const run = (...scope) => sd.collect(sd.parseArgs(["--owner", "acme", "--project", "Board", ...scope,
+    "--date", "2026-09-26"]));
+
+  beforeEach(() => sd.clearCaches());
+  afterEach(() => {
+    sd.io.gh = realGh;
+    sd.clearCaches();
+  });
+
+  test("PR searches cover the listed repositories and never the whole owner", () => {
+    const calls = fakeGh(board);
+    assert.equal(run("--repo", "acme/app", "--repo", "acme/api").sprint.title, "S2");
+    assert.equal(searches(calls).length, 3);
+    for (const args of searches(calls)) {
+      assert.ok(args.includes("--repo=acme/app") && args.includes("--repo=acme/api"), args.join(" "));
+      assert.ok(!args.some((arg) => arg.startsWith("--owner=")), args.join(" "));
+    }
+  });
+
+  test("--all-repos searches every repository the owner has", () => {
+    const calls = fakeGh(board);
+    run("--all-repos");
+    assert.equal(searches(calls).length, 3);
+    for (const args of searches(calls)) {
+      assert.ok(args.includes("--owner=acme"), args.join(" "));
+      assert.ok(!args.some((arg) => arg.startsWith("--repo=")), args.join(" "));
+    }
+  });
+
+  test("a board without an iteration field asks for the update", () => {
+    fakeGh((args) => board(args, { iterations: false }));
+    assert.throws(() => run("--repo", "acme/app"), (error) => error instanceof sd.UsageError
+      && error.message === `The board "Board" has no iteration field. ${sd.REPAIR}`);
   });
 });
