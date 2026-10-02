@@ -653,6 +653,73 @@ describe("GitHub setup", () => {
     assert.ok(github.repo("acme/space-game").linked.has(other.id));
   });
 
+  test("an update links the recorded board again instead of creating a second one", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    const recorded = board(github);
+    github.repo("acme/space-game").linked.clear();
+    const update = (...argv) => run(["update", project, ...argv], { github });
+    const preview = await update("--dry-run");
+    assert.equal(preview.code, 0, preview.output);
+    assert.match(preview.output, /#1, is no longer linked to acme\/space-game/);
+    assert.match(preview.output, /would link the project board "space-game Sprints" to acme\/space-game/);
+    assert.doesNotMatch(preview.output, /would create the project board/);
+    const refused = await update();
+    assert.equal(refused.code, 1);
+    assert.match(refused.output, /- link the project board "space-game Sprints" to acme\/space-game\n/);
+    assert.match(refused.output, /or rerun with --board 1 to link that board\.\n/);
+    const before = github.mutations().length;
+    const { code, output } = await update("--yes");
+    assert.equal(code, 0, output);
+    const mutations = github.mutations().slice(before);
+    assert.equal(mutations.length, 1);
+    assert.match(mutations[0].query, /linkProjectV2ToRepository/);
+    assert.ok(github.repo("acme/space-game").linked.has(recorded.id));
+    assert.deepEqual(github.boards.map((b) => b.title), ["space-game Sprints"]);
+    assert.doesNotMatch(output, /does not name the board/);
+  });
+
+  test("in a terminal, the recorded board is the first choice", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    github.addBoard({ title: "Roadmap" });
+    github.repo("acme/space-game").linked.clear();
+    let choices;
+    const { code, output } = await install(github, { interactive: true,
+      answers: { board: (offered) => { choices = offered; return offered[0].value; } } });
+    assert.equal(code, 0, output);
+    assert.deepEqual(choices.map((c) => c.label), ["space-game Sprints", "Roadmap"]);
+    assert.match(choices[0].hint, /recorded at the last installation/);
+    assert.ok(github.repo("acme/space-game").linked.has(board(github).id));
+    assert.equal(github.boards.length, 2);
+  });
+
+  test("refuses to create a board whose title an open board of the owner has", async () => {
+    const github = new FakeGitHub();
+    const namesake = github.addBoard({ title: "space-game Sprints" });
+    const refused = await install(github, {}, "--yes");
+    assert.equal(refused.code, 1);
+    assert.match(refused.output, /acme already has an open project board titled "space-game Sprints", #1, that is not linked/);
+    assert.match(refused.output, /To use that board, rerun with --board 1\.\n/);
+    assert.equal(github.mutations().length, 0);
+    assert.equal(exists(project, ".agents"), false);
+    let choices;
+    const chosen = await install(github, { interactive: true,
+      answers: { board: (offered) => { choices = offered; return offered[0].value; } } });
+    assert.equal(chosen.code, 0, chosen.output);
+    assert.ok(!choices.some((c) => c.value === null), "no choice creates a board");
+    assert.ok(github.repo("acme/space-game").linked.has(namesake.id));
+    assert.equal(github.boards.length, 1);
+  });
+
+  test("a tracker that names another board's URL gets a note, even with the same title", async () => {
+    write(project, "docs/agents/issue-tracker.md", "| Setting | Value |\n| --- | --- |\n"
+      + "| Project board | `space-game Sprints` owned by `acme`: https://github.com/users/acme/projects/7 |\n");
+    const { code, output } = await install(new FakeGitHub(), {}, "--yes");
+    assert.equal(code, 0, output);
+    assert.match(output, /does not name the board "space-game Sprints"\. Set its Project board row to:\n {2}`space-game Sprints` owned by `acme`: https:\/\/github\.com\/users\/acme\/projects\/1\n/);
+  });
+
   test("a dry run changes nothing on GitHub, and needs no consent", async () => {
     const github = new FakeGitHub();
     const { code, output } = await install(github, {}, "--dry-run");
