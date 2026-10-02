@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, test } from "node:test";
+import { fileURLToPath } from "node:url";
 import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
 import * as recap from "../skills/sprint-recap/scripts/sprint-recap.mjs";
 
@@ -140,16 +142,19 @@ describe("collection", () => {
   const realGh = sd.io.gh;
   const ARGS = ["--owner", "acme", "--since", "2025-01-06", "--until", "2025-01-12"];
   let queries;
+  let warnings;
 
   beforeEach(() => {
     sd.clearCaches();
     sd.io.gh = () => JSON.stringify({ data: { repositoryOwner: { __typename: "Organization", login: "acme" } } });
     queries = [];
+    warnings = [];
     recap.deps.api = () => ({ login: "me" });
     recap.deps.search = (query) => {
       queries.push(query);
       return [];
     };
+    recap.deps.warn = (message) => warnings.push(message);
   });
   afterEach(() => {
     sd.io.gh = realGh;
@@ -157,6 +162,22 @@ describe("collection", () => {
   });
 
   const run = (...extra) => JSON.parse(recap.main([...ARGS, ...extra]));
+
+  test("without --timezone the recap warns and records that it used UTC", () => {
+    const out = run("--repo", "acme/app");
+    assert.deepEqual(warnings, [recap.UTC_FALLBACK]);
+    assert.deepEqual(out.window, { startInclusive: "2025-01-06T00:00:00Z", endExclusive: "2025-01-13T00:00:00Z",
+      timezone: "UTC", timezoneDefaulted: true });
+    assert.ok(out.limitations.includes(recap.UTC_FALLBACK));
+  });
+
+  test("the sprint time zone needs no warning", () => {
+    const out = run("--repo", "acme/app", "--timezone", "Europe/Berlin");
+    assert.deepEqual(warnings, []);
+    assert.equal(out.window.startInclusive, "2025-01-05T23:00:00Z");
+    assert.equal(out.window.timezoneDefaulted, false);
+    assert.ok(!out.limitations.includes(recap.UTC_FALLBACK));
+  });
 
   test("searches cover the listed repositories, or the owner with --all-repos", () => {
     assert.equal(run("--repo", "acme/app", "--timezone", "UTC").scope,
@@ -168,6 +189,15 @@ describe("collection", () => {
       "Accessible acme repositories, regardless of board membership");
     assert.equal(queries.length, 4);
     for (const query of queries) assert.ok(query.startsWith("org:acme "), query);
+  });
+
+  test("the warning goes to stderr before any GitHub call", () => {
+    const script = fileURLToPath(new URL("../skills/sprint-recap/scripts/sprint-recap.mjs", import.meta.url));
+    // --until before --since stops the run before it reaches GitHub.
+    const res = spawnSync(process.execPath, [script, "--owner", "acme", "--repo", "acme/app",
+      "--since", "2026-09-10", "--until", "2026-09-01"], { encoding: "utf8" });
+    assert.equal(res.status, 1);
+    assert.equal(res.stderr, `Warning: ${recap.UTC_FALLBACK}\n--until is before --since.\n`);
   });
 });
 

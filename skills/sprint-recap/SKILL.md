@@ -24,7 +24,7 @@ them to flags:
 | Project board owner | `--owner <owner>` |
 | Project board title | `--project "<exact title>"` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
-| Sprint time zone | `--timezone <IANA zone>` |
+| Sprint time zone | `--timezone <IANA zone>`, on every run |
 | Each repository in the routing table's `Repository` column | `--repo <owner/repo>`, repeated |
 | Default repository, when the routing table has no `Repository` column | `--repo <owner/repo>`, once |
 
@@ -59,9 +59,12 @@ quarter, pass `--since YYYY-MM-DD` and optionally
 `--until YYYY-MM-DD` (inclusive, default today) instead of `--date`. Name that
 window in the recap rather than calling it a sprint.
 
-Dates use the time zone passed with `--timezone`, `UTC` when omitted. Use the
-tracker settings' sprint time zone unless the user requests another IANA time
-zone. The JSON records the exact start-inclusive, end-exclusive UTC window.
+Dates use the time zone passed with `--timezone`. Pass the tracker settings'
+sprint time zone unless the user requests another IANA time zone. When that
+setting is `TODO`, ask the user for a time zone rather than letting the script
+fall back to UTC. Without `--timezone`, the script uses UTC, writes a warning
+to stderr, and sets `window.timezoneDefaulted` to `true`. The JSON records the
+exact start-inclusive, end-exclusive UTC window.
 
 All remote calls are read-only and use `gh` authentication. If `read:project` is
 missing, tell the user to run `gh auth refresh -s read:project`. Do not work around
@@ -71,8 +74,10 @@ The collector paginates and rejects truncated searches rather than reporting par
 ## Write the recap
 
 Read the JSON before writing. Start with the sprint title or window, date range,
-account, time zone, scope, and collection cutoff. Say "so far" for an ongoing
-sprint. The JSON's `project.url` links the board when there is one.
+account, time zone, scope, and collection cutoff. When
+`window.timezoneDefaulted` is `true`, say that the dates use UTC because no
+sprint time zone was passed. Say "so far" for an ongoing sprint. The JSON's
+`project.url` links the board when there is one.
 
 Give a compact metrics table using these definitions:
 

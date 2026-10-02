@@ -14,6 +14,9 @@ import * as sprintData from "../../sprint-status/scripts/sprint-data.mjs";
 
 const { UsageError, isoDate, addDays, REPAIR } = sprintData;
 
+export const UTC_FALLBACK = "No --timezone was passed, so dates use UTC, not the sprint time zone in "
+  + "docs/agents/issue-tracker.md.";
+
 export function timestamp(value) {
   return new Date(value);
 }
@@ -77,8 +80,11 @@ export function window(sprint, timeZone, now) {
   return [start, end.getTime() < now.getTime() ? end : now];
 }
 
-/** Swappable in tests: every GitHub call in this file goes through deps. */
+/** Swappable in tests: every GitHub call and warning in this file goes through deps. */
 export const deps = {
+  warn(message) {
+    process.stderr.write(`Warning: ${message}\n`);
+  },
   api(endpoint, params = {}) {
     const args = ["api", "--method", "GET", endpoint];
     for (const [key, value] of Object.entries(params)) args.push("-f", `${key}=${value}`);
@@ -220,7 +226,8 @@ const USAGE = `Usage: node sprint-recap.mjs --owner <owner> [--project <number o
 
 Pass --repo for each repository in the routing table of
 docs/agents/issue-tracker.md. --all-repos covers every repository the owner has
-instead.
+instead. Pass that file's sprint time zone as --timezone. Without it, dates use
+UTC and the script warns.
 
 --date selects the sprint containing that date. --since and --until select an
 explicit window instead, such as a month or a quarter.`;
@@ -239,7 +246,7 @@ export function parseArgs(argv) {
         date: { type: "string" },
         since: { type: "string" },
         until: { type: "string" },
-        timezone: { type: "string", default: "UTC" },
+        timezone: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -263,7 +270,8 @@ export function parseArgs(argv) {
     date: values.date ? isoDate(values.date, "--date") : null,
     since: values.since ? isoDate(values.since, "--since") : null,
     until: values.until ? isoDate(values.until, "--until") : null,
-    timezone: checkTimeZone(values.timezone),
+    timezone: checkTimeZone(values.timezone ?? "UTC"),
+    timezoneDefaulted: values.timezone === undefined,
   };
 }
 
@@ -294,6 +302,7 @@ export function selectPeriod(args, now) {
 export function main(argv) {
   const args = parseArgs(argv);
   if (args.help) return args.help;
+  if (args.timezoneDefaulted) deps.warn(UTC_FALLBACK);
   const now = new Date();
   const [board, period, start, end] = selectPeriod(args, now);
   const me = deps.api("user").login;
@@ -305,7 +314,8 @@ export function main(argv) {
     generatedAt: iso(now),
     project: board ? { title: board.title, url: board.url } : null,
     sprint: period,
-    window: { startInclusive: iso(start), endExclusive: iso(end), timezone: args.timezone },
+    window: { startInclusive: iso(start), endExclusive: iso(end), timezone: args.timezone,
+      timezoneDefaulted: args.timezoneDefaulted },
     scope: args.repos.length
       ? `${args.repos.join(", ")}, regardless of board membership`
       : `Accessible ${args.owner} repositories, regardless of board membership`,
@@ -321,6 +331,7 @@ export function main(argv) {
       "Reviews count submitted reviews on others' PRs, including reviews later dismissed, not comments or pending drafts.",
       "Open-to-merge time includes draft time and time before the period. It is not working time.",
       "Board commitments, hours worked, deployments, and unpushed work are not measured.",
+      ...(args.timezoneDefaulted ? [UTC_FALLBACK] : []),
     ],
   };
   return JSON.stringify(result, null, 2);
