@@ -87,6 +87,20 @@ describe("content", () => {
     assert.deepEqual([...referenced].filter((name) => !templates.has(name)), []);
   });
 
+  test("the templates carry the profile fields the skills read", () => {
+    const templates = path.join(ROOT, "skills", "setup-project", "templates");
+    const domain = fs.readFileSync(path.join(templates, "domain.md"), "utf8");
+    const boundaries = domain.slice(domain.indexOf("## Boundaries"));
+    assert.match(boundaries, /^\| Boundary \|.*\| Local check \|$/m);
+    const verification = fs.readFileSync(path.join(templates, "verification.md"), "utf8");
+    assert.match(verification, /^\| Deploys \| /m);
+    for (const [name, field] of [["cross-boundary-contract", "Local check"], ["cross-boundary-contract", "Deploys"],
+      ["verify-work", "Local check"], ["prepare-pr", "Deploys"]]) {
+      const text = fs.readFileSync(path.join(ROOT, "skills", name, "SKILL.md"), "utf8");
+      assert.ok(text.includes(`\`${field}\``), `${name} reads ${field}`);
+    }
+  });
+
   test("the fleet and every borrowed skill carry an MIT licence", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
     assert.equal(pkg.license, "MIT");
