@@ -462,12 +462,11 @@ describe("a clone with branches in every state", () => {
     const warnings = [];
     sd.io.warn = (message) => warnings.push(message);
     try {
-      // Already 2026-10-02 in Auckland, still 2026-10-01 in UTC.
-      const now = new Date("2026-10-01T12:00:00Z");
+      // Already 2026-10-02 in Tokyo, still 2026-10-01 in UTC.
+      const now = new Date("2026-10-01T16:00:00Z");
       const zoned = rd.collect(rd.parseArgs(["--no-sprint", "--no-fetch", "--path", "app",
-        "--timezone", "Pacific/Auckland"]), dir, now);
-      assert.deepEqual([zoned.today, zoned.timezone, zoned.timezoneDefaulted],
-        ["2026-10-02", "Pacific/Auckland", false]);
+        "--timezone", "Asia/Tokyo"]), dir, now);
+      assert.deepEqual([zoned.today, zoned.timezone, zoned.timezoneDefaulted], ["2026-10-02", "Asia/Tokyo", false]);
       assert.deepEqual(warnings, []);
       const machine = rd.collect(rd.parseArgs(["--no-sprint", "--no-fetch", "--path", "app"]), dir, now);
       assert.equal(machine.timezoneDefaulted, true);

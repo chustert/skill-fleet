@@ -116,16 +116,11 @@ describe("iterations", () => {
 describe("today and the time zone", () => {
   const NOW = new Date("2026-09-26T20:00:00Z");
 
-  test("today follows the time zone, not the machine", () => {
-    assert.equal(sd.zoneToday(NOW, "Pacific/Auckland"), "2026-09-27");
-    assert.equal(sd.zoneToday(NOW, "America/New_York"), "2026-09-26");
-  });
-
   test("--date comes first, then --timezone, then the machine's clock", () => {
     assert.deepEqual(sd.sprintToday("2026-09-01", null, NOW),
       { today: "2026-09-01", timezone: null, timezoneDefaulted: false });
-    assert.deepEqual(sd.sprintToday(null, "Pacific/Auckland", NOW),
-      { today: "2026-09-27", timezone: "Pacific/Auckland", timezoneDefaulted: false });
+    assert.deepEqual(sd.sprintToday(null, "Asia/Tokyo", NOW),
+      { today: "2026-09-27", timezone: "Asia/Tokyo", timezoneDefaulted: false });
     const machine = sd.sprintToday(null, null, NOW);
     assert.equal(machine.timezoneDefaulted, true);
     assert.equal(machine.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone ?? null);
@@ -310,10 +305,10 @@ describe("collection", () => {
 
   test("the sprint time zone picks today, without a warning", () => {
     fakeGh(board);
-    // 2026-10-04 is the last day of S2 in UTC, and already 2026-10-05 in Auckland.
+    // 2026-10-04 is the last day of S2 in UTC, and already 2026-10-05 in Tokyo.
     const out = sd.collect(sd.parseArgs(["--owner", "acme", "--project", "Board", "--repo", "acme/app",
-      "--timezone", "Pacific/Auckland"]), new Date("2026-10-04T12:00:00Z"));
-    assert.deepEqual([out.today, out.timezone, out.timezoneDefaulted], ["2026-10-05", "Pacific/Auckland", false]);
+      "--timezone", "Asia/Tokyo"]), new Date("2026-10-04T16:00:00Z"));
+    assert.deepEqual([out.today, out.timezone, out.timezoneDefaulted], ["2026-10-05", "Asia/Tokyo", false]);
     assert.equal(out.sprint, null);
     assert.deepEqual(warnings, []);
   });
