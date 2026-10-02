@@ -66,7 +66,7 @@ Flags answer a single question instead:
 | `--instructions`, `--no-instructions` | Create and update `AGENTS.md` and `CLAUDE.md`, or leave both alone |
 | `--force` | Overwrite conflicting files without asking, and run over an installation made by a newer version |
 | `--board <number or title>` | Use this board of the repository's owner, linking it to the repository. Naming the board approves the link, also without a terminal |
-| `--dry-run` | Show what would change, on GitHub and on disk, and change nothing |
+| `--dry-run` | Show what would change, on GitHub and on disk, and change nothing. Conflicting files are listed with the rest, and the dry run fails when they would stop the real run |
 
 The installer writes:
 

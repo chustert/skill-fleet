@@ -712,6 +712,24 @@ describe("GitHub setup", () => {
     assert.equal(github.boards.length, 1);
   });
 
+  test("a dry run that meets a conflict still lists the board and file changes, and fails", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    fs.appendFileSync(path.join(project, ".agents/skills/tdd/SKILL.md"), "\nLocal edit.\n");
+    fs.rmSync(path.join(project, ".agents/skills/teach/SKILL.md"));
+    const created = board(github);
+    created.fields = created.fields.filter((f) => f.name !== "Sprint");
+    const before = github.mutations().length;
+    const { code, output } = await run(["update", project, "--dry-run"], { github, interactive: true });
+    assert.equal(code, 1, output);
+    assert.match(output, /so the run would stop before writing anything:\n {2}\.agents\/skills\/tdd\/SKILL\.md: changed since the fleet installed it\n/);
+    assert.match(output, /would add a Sprint field with 2-week sprints on "space-game Sprints"/);
+    assert.match(output, /would create \.agents\/skills\/teach\/SKILL\.md/);
+    assert.match(output, /Nothing was written, on GitHub or on disk\.\nThe run would stop at the conflicts above\. Resolve them, or rerun with --force to overwrite them\.\n/);
+    assert.equal(github.mutations().length, before);
+    assert.equal(exists(project, ".agents/skills/teach/SKILL.md"), false);
+  });
+
   test("a tracker that names another board's URL gets a note, even with the same title", async () => {
     write(project, "docs/agents/issue-tracker.md", "| Setting | Value |\n| --- | --- |\n"
       + "| Project board | `space-game Sprints` owned by `acme`: https://github.com/users/acme/projects/7 |\n");
