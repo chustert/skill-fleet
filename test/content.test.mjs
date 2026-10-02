@@ -14,6 +14,10 @@ const GUIDE_SECTIONS = ["## Test seams", "## Runtime evidence", "## Bug feedback
 // users/ segments of board URLs, and the credited author of a borrowed pattern.
 const GITHUB_OWNER = /(?<![\w.-])github\.com[:/]([\w.-]+)/g;
 const ALLOWED_OWNERS = new Set(["owner", "acme", "orgs", "users", "mattpocock"]);
+// An IANA time zone name, by the areas the tz database uses, including its old country links such as US/Eastern.
+const TIME_ZONE = /\b(?:Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|Etc|US|Canada|Brazil|Mexico|Chile)\/[A-Z][A-Za-z_+-]*(?:\/[A-Z][A-Za-z_+-]*)?/g;
+// The tracker template's example zone, which the time zone check's error message repeats.
+const ALLOWED_ZONES = new Set(["Europe/Berlin"]);
 
 /** Files the package ships, with forward-slash paths relative to the fleet. */
 function shippedFiles() {
@@ -75,6 +79,13 @@ describe("content", () => {
     const named = matchingLines((line) =>
       [...line.matchAll(GITHUB_OWNER)].some(([, owner]) => !ALLOWED_OWNERS.has(owner)));
     assert.deepEqual(named, []);
+  });
+
+  test("no time zone ships except the template's example", () => {
+    const named = matchingLines((line) => [...line.matchAll(TIME_ZONE)].some(([zone]) => !ALLOWED_ZONES.has(zone)));
+    assert.deepEqual(named, []);
+    assert.ok(matchingLines((line) => line.includes("`Europe/Berlin`"))
+      .some((found) => found.startsWith("skills/setup-project/templates/issue-tracker.md:")));
   });
 
   test("nothing shipped still depends on Python", () => {
