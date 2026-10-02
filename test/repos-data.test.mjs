@@ -426,11 +426,13 @@ describe("a clone with branches in every state", () => {
     assert.ok(out.includes("| ⚪ | no worktree | 1 merged or empty branch | — | — | safe to delete |"));
   });
 
-  test("a board problem leaves the branch report and names the problem", () => {
+  test("a board problem leaves the branch report and asks for the update with approval", () => {
     const args = rd.parseArgs(["--owner", "acme", "--project", "Missing board", "--path", "app", "--no-fetch",
       "--date", TODAY]);
     const report = rd.collect(args, dir);
     assert.equal(report.repositories.length, 1);
-    assert.match(report.sprint.error, /npx skill-fleet@latest update/);
+    assert.ok(report.sprint.error.endsWith(sd.REPAIR), report.sprint.error);
+    assert.match(report.sprint.error, /Ask the user to run npx skill-fleet@latest update/);
+    assert.match(report.sprint.error, /only with the user's approval, after a preview with --dry-run/);
   });
 });

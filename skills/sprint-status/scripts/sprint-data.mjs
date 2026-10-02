@@ -172,7 +172,8 @@ const USAGE = `Usage: node sprint-data.mjs --owner <owner> --project <number or 
 
 The project is the board named in docs/agents/issue-tracker.md. Omit --repo to
 cover every repository the owner has.`;
-export const REPAIR = "Run npx skill-fleet@latest update, which creates or repairs the board.";
+export const REPAIR = "Ask the user to run npx skill-fleet@latest update, which creates or repairs the board. "
+  + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with --dry-run.";
 
 export function parseArgs(argv) {
   let values;

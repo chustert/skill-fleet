@@ -153,10 +153,12 @@ describe("periods", () => {
     assert.equal(recap.iso(start), "2026-09-09T22:00:00Z");
   });
 
-  test("a board without iterations asks for a window", () => {
+  test("a board without iterations asks for the update or a window", () => {
     recap.deps.resolveIterations = () => [{ title: "Board", url: "u" }, null, null, []];
     assert.throws(() => recap.selectPeriod(recap.parseArgs(["--owner", "acme", "--project", "Board"]), NOW),
-      /no iteration field/);
+      (error) => error instanceof sd.UsageError
+        && error.message === `The board "Board" has no iteration field. ${sd.REPAIR} `
+          + "To recap a date window instead, pass --since and --until.");
   });
 
   test("no sprint on the chosen date is an error", () => {

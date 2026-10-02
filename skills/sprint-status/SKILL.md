@@ -12,11 +12,15 @@ in-flight item.
 
 ## 1. Collect the data
 
-Read the tracker settings in `docs/agents/issue-tracker.md` and map them to
-flags. The board is required: if the settings name none, say so and tell the
-user to run `npx skill-fleet@latest update`, which creates or repairs it. If
-another value the command needs is still `TODO`, say so and recommend
-`setup-project` rather than guessing.
+Read the tracker settings and the routing table in
+`docs/agents/issue-tracker.md`, following the
+[rules for reading the profile](../../references/project-profile.md), and map
+them to flags. The board is required: if the settings name none, say so and ask
+the user to run `npx skill-fleet@latest update`, which creates or repairs the
+board. It changes the project board on GitHub, so it runs only with the user's
+approval, after a preview with `--dry-run`. Do not run it yourself without that
+approval. If another value the command needs is still `TODO`, say so and
+recommend `setup-project` rather than guessing.
 
 | Tracker setting | Flag |
 | --- | --- |
@@ -48,8 +52,10 @@ different sprint.
 If it exits asking for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project` — do not try to work around it. If it reports
 that it found no board with that title, or several, or that the board has no
-iteration field, say so, point at the tracker settings, and recommend
-`npx skill-fleet@latest update`; do not substitute another project.
+iteration field, say so and point at the tracker settings. Ask the user to run
+`npx skill-fleet@latest update`, which creates or repairs the board. It changes
+the project board on GitHub, so it runs only with the user's approval, after a
+preview with `--dry-run`. Do not substitute another project.
 
 Read the JSON before writing anything. The fields that matter:
 
@@ -77,8 +83,12 @@ code actually is. Keep it to a quick pass — the goal is one or two factual
 sentences per item, not a review.
 
 Find each item's local checkout from the `Local path` column of the routing
-table in `docs/agents/issue-tracker.md`, relative to the project root. Report an
-item whose repository has no local path from GitHub alone.
+table in `docs/agents/issue-tracker.md`, relative to the project root. When the
+table gives no local path for the default repository from the tracker settings,
+use the project root, the directory that holds `.agents/skills/`, as its
+checkout, as `repos-report` does. Check first that the root's `origin` remote
+is that repository. A local path of `None` means the repository has no
+checkout. Report an item whose repository has no checkout from GitHub alone.
 
 Useful signals, cheapest first:
 

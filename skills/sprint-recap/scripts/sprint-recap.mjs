@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs as parseFlags } from "node:util";
 import * as sprintData from "../../sprint-status/scripts/sprint-data.mjs";
 
-const { UsageError, isoDate, addDays } = sprintData;
+const { UsageError, isoDate, addDays, REPAIR } = sprintData;
 
 export function timestamp(value) {
   return new Date(value);
@@ -274,8 +274,8 @@ export function selectPeriod(args, now) {
     let field;
     [board, field, period] = deps.resolveIterations(args.owner, args.project, selected, args.iterationField);
     if (!field) {
-      throw new UsageError("The board has no iteration field. Run npx skill-fleet@latest update, which adds it, "
-        + "or pass --since and --until.");
+      throw new UsageError(`The board "${board.title}" has no iteration field. ${REPAIR} `
+        + "To recap a date window instead, pass --since and --until.");
     }
     if (!period) throw new UsageError(`No sprint contains ${selected}. Choose a date inside an iteration.`);
   }

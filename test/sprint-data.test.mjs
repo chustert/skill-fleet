@@ -169,6 +169,13 @@ describe("arguments and search scope", () => {
     assert.throws(() => sd.parseArgs(["--owner", "a", "--project", "B", "--date", "tomorrow"]), sd.UsageError);
   });
 
+  test("a board problem asks the user to run the update, with approval and a dry run first", () => {
+    assert.match(sd.REPAIR, /^Ask the user to run npx skill-fleet@latest update, which creates or repairs the board\./);
+    assert.match(sd.REPAIR, /changes the project board on GitHub, so it runs only with the user's approval/);
+    assert.match(sd.REPAIR, /--dry-run/);
+    assert.throws(() => sd.pickProject([], "Board", "acme"), (error) => error.message.endsWith(sd.REPAIR));
+  });
+
   test("comment excerpts collapse whitespace and stop at 400 characters", () => {
     assert.equal(sd.excerpt(" a\n\n b\tc "), "a b c");
     assert.equal(sd.excerpt("x".repeat(500)).length, 400);
