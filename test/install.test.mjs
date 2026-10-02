@@ -724,6 +724,52 @@ describe("GitHub setup", () => {
     assert.equal(github.boards.length, 1);
   });
 
+  test("finds the recorded board and a board with the workflow's title among more than 20 boards", async () => {
+    const github = new FakeGitHub();
+    await install(github, {}, "--yes");
+    const recorded = board(github);
+    github.repo("acme/space-game").linked.clear();
+    // 25 boards updated since, so the recorded one is not among the 20 most recent.
+    for (let index = 0; index < 25; index += 1) github.addBoard({ title: `space-game Sprints ${index}` });
+    const { code, output } = await run(["update", project, "--yes"], { github });
+    assert.equal(code, 0, output);
+    assert.ok(github.repo("acme/space-game").linked.has(recorded.id));
+    assert.equal(github.boards.filter((b) => b.title === "space-game Sprints").length, 1);
+    // Without a record, the board with the workflow's title stops the run instead of getting a twin.
+    const { dir: otherDir, project: other } = tempProject("space-game");
+    try {
+      const fresh = new FakeGitHub();
+      const namesake = fresh.addBoard({ title: "space-game Sprints" });
+      for (let index = 0; index < 25; index += 1) fresh.addBoard({ title: `Team board ${index}` });
+      const refused = await run(["install", other, "--yes"], { github: fresh });
+      assert.equal(refused.code, 1, refused.output);
+      assert.match(refused.output, new RegExp(`titled "space-game Sprints", #${namesake.number}, that is not linked`));
+      assert.equal(fresh.mutations().length, 0);
+      const named = await run(["install", other, "--yes", "--board", String(namesake.number)], { github: fresh });
+      assert.equal(named.code, 0, named.output);
+      assert.ok(fresh.repo("acme/space-game").linked.has(namesake.id));
+      assert.equal(fresh.boards.length, 26);
+    } finally {
+      fs.rmSync(otherDir, { recursive: true, force: true });
+    }
+  });
+
+  test("--board finds a board by its title among more than 20 boards, and refuses a title two boards share", async () => {
+    const github = new FakeGitHub();
+    const wanted = github.addBoard({ title: "Team board", statuses: ["Todo", "In progress", "In review", "Done"],
+      iteration: "Sprint" });
+    for (let index = 0; index < 25; index += 1) github.addBoard({ title: `Team board ${index}` });
+    const { code, output } = await install(github, {}, "--board", "Team board");
+    assert.equal(code, 0, output);
+    assert.ok(github.repo("acme/space-game").linked.has(wanted.id));
+    github.repo("acme/space-game").linked.clear();
+    const twin = github.addBoard({ title: "Team board" });
+    const refused = await install(github, {}, "--board", "Team board");
+    assert.equal(refused.code, 1, refused.output);
+    assert.ok(refused.output.includes(`acme has 2 open project boards titled "Team board": #${twin.number} and `
+      + `#${wanted.number}. Name one by its number with --board.`), refused.output);
+  });
+
   test("a dry run that meets a conflict still lists the board and file changes, and fails", async () => {
     const github = new FakeGitHub();
     await install(github, {}, "--yes");
