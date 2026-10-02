@@ -986,6 +986,33 @@ describe("versions and profile settings", () => {
     assert.deepEqual(missingSettings(templateText, `${table}| Platform | web |\n`).rows, [{ name: "Deploys", component: null }]);
   });
 
+  test("tables read as GitHub renders them, without outer pipes and outside code fences", () => {
+    const table = "| Setting | Value |\n| --- | --- |\n";
+    const templateText = `## Components\n\n### TODO component (\`path/\`)\n\n${table}| Platform | TODO |\n| Deploys | TODO |\n`;
+    const bare = "Setting | Value\n--- | ---\nPlatform | web\nDeploys | None\n";
+    assert.deepEqual(missingSettings(templateText, bare).rows, []);
+    const open = "| Setting | Value\n| --- | ---\n| Platform | web\n";
+    assert.deepEqual(missingSettings(templateText, open).rows, [{ name: "Deploys", component: null }]);
+    const fenced = `## Components\n\n### Web\n\n${table}| Platform | web |\n| Deploys | None |\n\n`
+      + "```md\n## Example\n\n| Setting | Value |\n| --- | --- |\n| Deploys | None |\n```\n\n"
+      + `### Worker\n\n${table}| Platform | service |\n`;
+    assert.deepEqual(missingSettings(templateText, fenced).rows, [{ name: "Deploys", component: "Worker" }]);
+    const domain = "## Boundaries\n\n| Boundary | Producer\n| --- | ---\n| API | web\n";
+    const boundaries = "## Boundaries\n\n| Boundary | Producer | Local check |\n| --- | --- | --- |\n| TODO | TODO | TODO |\n";
+    assert.deepEqual(missingSettings(boundaries, domain).columns, [{ table: "Boundaries", name: "Local check" }]);
+  });
+
+  test("components written as sections of their own are checked one by one", () => {
+    const table = "| Setting | Value |\n| --- | --- |\n";
+    const templateText = `## Components\n\n### TODO component (\`path/\`)\n\n${table}| Platform | TODO |\n| Deploys | TODO |\n`;
+    const text = `## Web (\`web/\`)\n\n${table}| Platform | web |\n| Deploys | None |\n\n`
+      + `## Worker (\`worker/\`)\n\n${table}| Platform | service |\n`;
+    assert.deepEqual(missingSettings(templateText, text).rows, [{ name: "Deploys", component: "Worker (`worker/`)" }]);
+    // One table under the template's own heading counts for the whole file.
+    assert.deepEqual(missingSettings(templateText, `## Components\n\n${table}| Platform | web |\n`).rows,
+      [{ name: "Deploys", component: null }]);
+  });
+
   test("the templates yield the settings to look for, and lack none of them", () => {
     const rows = (missing) => missing.rows.map((row) => row.name);
     assert.ok(rows(missingSettings(template("issue-tracker.md"), "")).includes("Default repository"));
