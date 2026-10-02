@@ -222,8 +222,8 @@ lanes, or the engine's command line.
 - Record the local run command and the runtime evidence method, starting from
   the defaults in the component's platform guide in
   [platforms](../../references/platforms/README.md). When the component has
-  several surfaces, such as pages, a public API, and a script that other sites
-  embed, record one runtime evidence entry for each.
+  several entry points, such as pages, a public API, and a script that other
+  sites embed, record one runtime evidence entry for each.
 - Record prerequisites: local services, seeded data, accounts, simulators,
   devices, engine or SDK versions, and licences.
 - Record what a merge or release triggers in the `Deploys` row. Look in the

@@ -114,9 +114,9 @@ and required. Use `Not verified` when the missing part could not be exercised.
 For every behaviour change, capture direct local runtime evidence on the
 platform that runs it. Follow the runtime-evidence section of the component's
 platform guide, using the local run command and the `Runtime evidence` row in
-`docs/agents/verification.md`. That row may list one method per surface, such
-as pages, a public API, and a script embedded by other sites. Gather evidence
-on every surface the change touches. Across every platform:
+`docs/agents/verification.md`. That row may list one method per entry point,
+such as pages, a public API, and a script embedded by other sites. Gather
+evidence at every entry point the change touches. Across every platform:
 
 1. Start or reuse the local services with the documented commands. Check the
    health of a running service before starting a duplicate.

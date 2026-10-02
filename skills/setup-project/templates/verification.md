@@ -17,7 +17,7 @@ Repeat this section for every component in the routing table of `docs/agents/iss
 | Focused test | TODO: how to run one test or file. |
 | Final verification | TODO: the exact commands, in order, and their working directory. |
 | Local run | TODO: how to start it locally. |
-| Runtime evidence | TODO: how to observe it working, such as "a browser at `http://localhost:3000`", "the iOS simulator", "Play Mode in the editor", or "an HTTP request to the local API". When the component has several surfaces, such as pages, a public API, and a script that other sites embed, list one entry for each. |
+| Runtime evidence | TODO: how to observe it working, such as "a browser at `http://localhost:3000`", "the iOS simulator", "Play Mode in the editor", or "an HTTP request to the local API". When the component has several entry points, such as pages, a public API, and a script that other sites embed, list one entry for each. |
 | Prerequisites | TODO: local services, seeded data, accounts, devices, engine or SDK versions, licences. |
 | Deploys | TODO: what a merge or release triggers for this component, such as "a merge to `main` deploys it to production" or "a version tag publishes it to the package registry", or `None`. |
 

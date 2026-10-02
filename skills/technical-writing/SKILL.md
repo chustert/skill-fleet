@@ -13,7 +13,7 @@ Three rules sit above the layers:
 - **Use the short, everyday word.** "Use", not "utilize". "Help", not "facilitate". "Do", not "perform". A long word has to buy its length with precision.
 - **When a rule makes a sentence worse, fix the sentence another way or leave it alone.** The rules serve the reader. A sentence that follows every rule and sounds like a machine wrote it has failed.
 
-The codebase is the word list. Write the real symbol, file, flag, or command name, not a synonym or a description of it. The project glossary named in `docs/agents/domain.md` is the word list for product concepts.
+The codebase is the word list. Write the real symbol, file, flag, or command name, not a synonym or a description of it. The project glossary named in `docs/agents/domain.md` is the word list for product concepts. Handle a missing profile file, or a `TODO` or `None` value, as the [project profile](../../references/project-profile.md) describes.
 
 Don't invent jargon. Use the words a developer would say out loud: "move", "delete", "a budget that only decreases", not "evacuate", "ratchet", or "endgame". A named pattern is fine when the doc says what it means the first time. Add new offenders to `unslop`'s abstract-metaphor rule with their replacement.
 

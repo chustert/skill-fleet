@@ -38,7 +38,9 @@ Keep credentials in the environment rather than command text or committed
 fixtures. Do not open or print the protected files listed in
 `docs/agents/verification.md`, or any other secret-bearing file, merely to debug
 configuration. When `docs/agents/verification.md` is missing, or its protected
-files are still `TODO`, follow the protected-file rules in `AGENTS.md`.
+files are still `TODO`, treat the files that the
+[project profile](../../references/project-profile.md) lists as protected until
+then.
 
 Preserve unrelated working-tree changes. Temporary instrumentation and harnesses
 must be uniquely identifiable and removable; do not hide debugging state in a

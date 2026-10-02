@@ -45,7 +45,7 @@ repository keeps its own Git history.
 | `CLAUDE.md` | project, except one section | Imports `AGENTS.md` for Claude Code with `@AGENTS.md`. The installer creates it, or adds the import, when Claude Code is an installed tool. |
 | `docs/agents/issue-tracker.md` | project | Tracker settings, the project board and its lifecycle statuses, branch conventions, and the routing table that maps each component to its repository, local path, and responsibilities. The installer creates it with every setting it reads from GitHub; `setup-project` adds the routing and labels. |
 | `docs/agents/domain.md` | project | The knowledge reading order, glossary, architecture, contracts document, known boundaries and how to check each one locally, ADR location, and the project's quality weighting. |
-| `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence for each surface, prerequisites, and what a merge or release deploys. Also the online and paid services that need approval, protected files, and review-worktree setup. |
+| `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence for each entry point, prerequisites, and what a merge or release deploys. Also the online and paid services that need approval, protected files, and review-worktree setup. |
 | `.agents/references/` | fleet | Shared models every project uses: this file, the software-quality characteristics, the GitHub reference rules, and the platform guides. Change them in the fleet and reinstall; do not edit them in a project. |
 
 The templates for the three profile files and for a new `AGENTS.md` live in
@@ -94,3 +94,10 @@ The templates for the three profile files and for a new `AGENTS.md` live in
    guides, and CI configuration. Recommend `setup-project`. A step that changes
    the tracker, such as creating an issue or moving a status, stops instead of
    guessing its target.
+7. Until `docs/agents/verification.md` lists the protected files, because the
+   file is missing or the list is still `TODO`, treat these as protected:
+   ignored `.env` files other than committed examples, signing files and
+   keystores, service-account JSON files, cloud credential files, `*.tfvars`,
+   and any file the protected-file rules in `AGENTS.md` name. Find them by name
+   only, using `git check-ignore` and `git ls-files` to tell an ignored local
+   file from a committed example. Never open one to find out what it holds.

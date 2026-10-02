@@ -24,7 +24,7 @@ TODO: how to install dependencies and run the project locally, or a link to the 
 
 ## Security and secrets
 
-- Never open, print, search, copy, or diff the protected files listed in `docs/agents/verification.md`. Use the committed example files instead.
+- Never open, print, search, copy, or diff the protected files listed in `docs/agents/verification.md`. Until that file lists them, treat the files `.agents/references/project-profile.md` names as protected. Use the committed example files instead.
 - TODO: rules specific to this project, such as which keys must never reach client code. Delete this line if there are none.
 
 ## Completion checks

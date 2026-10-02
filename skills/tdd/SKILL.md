@@ -54,21 +54,16 @@ architecture, cost, or scope.
 ## When no harness fits the seam
 
 Do not install or replace a test framework as incidental feature work. A
-component can have a test runner and still lack a harness for the seam a
-behaviour needs, such as a unit-test runner with no way to drive the UI or to
-start a local server. Document that gap. Then either use an approved lower seam
-that the existing harness reaches, or return the test-foundation work to issue
-planning.
-
-`docs/agents/verification.md` records `None` as the test harness for a
-component with no test runner at all. Report the gap, and either use an
-approved lower seam that does have a harness, or use the strongest local
+component may have no test runner at all, which `docs/agents/verification.md`
+records as `None` for the test harness. It may also have a runner that cannot
+reach the seam a behaviour needs, such as a unit-test runner with no way to
+drive the UI or to start a local server. Either way, report the gap. Then use
+an approved lower seam that a harness reaches, or use the strongest local
 evidence the component offers as the red and green observations: a request
 against the local route, a CLI run, a scripted play-test step, or a browser or
-simulator check. Record the exact command or steps for both observations. Name
-the missing harness in the handoff so a separate issue can add one. If the
-behaviour cannot be observed locally at all, return the test-foundation work to
-issue planning.
+simulator check. Record the exact command or steps for both observations. Name the missing harness in the handoff so a separate issue can
+add one. If the behaviour cannot be observed locally at all, return the
+test-foundation work to issue planning.
 
 ## Write tests worth keeping
 

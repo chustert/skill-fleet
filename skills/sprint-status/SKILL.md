@@ -103,8 +103,8 @@ sentences per item, not a review.
 Find each item's local checkout from the `Local path` column of the routing
 table in `docs/agents/issue-tracker.md`, relative to the project root. When the
 table gives the default repository no local path, use the project root, which
-holds `.agents/skills/`, as its checkout, like `repos-report` does. Do so only
-if the root's `origin` remote is that repository. Otherwise the repository has
+holds `.agents/skills/`, as its checkout, but only if the root's `origin`
+remote is that repository. Otherwise the repository has
 no checkout. A local path of `None` also means no checkout. Report an item
 whose repository has no checkout from GitHub alone.
 

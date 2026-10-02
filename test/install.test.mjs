@@ -349,6 +349,7 @@ describe("AGENTS.md and CLAUDE.md", () => {
     assert.ok(block.includes(`When it is missing or incomplete, ${request} The update creates or repairs the project `
       + `board on GitHub. ${approval}`), block);
     assert.match(block, /Do not edit by hand the files that `\.agents\/skill-fleet\.json` records/);
+    assert.match(block, /Put a project's own skill in its own folder under `\.agents\/skills\/`, and add nothing inside a fleet skill's folder or `\.agents\/references\/`\./);
     assert.ok(block.includes(`To update the fleet's files, ${request} The update can also change the project board on `
       + `GitHub. ${approval} If the user asks you to run the update yourself, add \`--yes\``), block);
     assert.match(block, /Adding `--force`, which overwrites files changed by hand, needs its own approval\./);
