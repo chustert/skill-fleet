@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs as parseFlags } from "node:util";
 import * as sprintData from "../../sprint-status/scripts/sprint-data.mjs";
 
-const { UsageError, isoDate, addDays, REPAIR } = sprintData;
+const { UsageError, isoDate, addDays, REPAIR, checkTimeZone, zoneParts, zoneToday } = sprintData;
 
 export const UTC_FALLBACK = "No --timezone was passed, so dates use UTC, not the sprint time zone in "
   + "docs/agents/issue-tracker.md.";
@@ -31,25 +31,6 @@ export function within(value, start, end) {
   return start.getTime() <= time && time < end.getTime();
 }
 
-function checkTimeZone(timeZone) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-  } catch {
-    throw new UsageError(`Unknown time zone ${JSON.stringify(timeZone)}. Use an IANA name, such as Europe/Berlin.`);
-  }
-  return timeZone;
-}
-
-function zoneParts(date, timeZone) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  }).formatToParts(date);
-  const get = (type) => Number(parts.find((p) => p.type === type).value);
-  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"),
-    second: get("second") };
-}
-
 /** How far the zone's wall clock is ahead of UTC at this instant, in milliseconds. */
 function zoneOffset(date, timeZone) {
   const p = zoneParts(date, timeZone);
@@ -66,13 +47,6 @@ export function zoneMidnight(date, timeZone) {
   return new Date(instant);
 }
 
-/** Today's date in the time zone, as YYYY-MM-DD. */
-export function zoneToday(now, timeZone) {
-  const p = zoneParts(now, timeZone);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
-}
-
 /** The start-inclusive, end-exclusive UTC window of a sprint, stopping at now. */
 export function window(sprint, timeZone, now) {
   const start = zoneMidnight(sprint.start, timeZone);
@@ -83,7 +57,7 @@ export function window(sprint, timeZone, now) {
 /** Swappable in tests: every GitHub call and warning in this file goes through deps. */
 export const deps = {
   warn(message) {
-    process.stderr.write(`Warning: ${message}\n`);
+    sprintData.io.warn(message);
   },
   api(endpoint, params = {}) {
     const args = ["api", "--method", "GET", endpoint];

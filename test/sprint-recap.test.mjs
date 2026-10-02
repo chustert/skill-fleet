@@ -36,8 +36,8 @@ describe("windows and time zones", () => {
 
   test("today follows the time zone, not the machine", () => {
     const now = new Date("2026-09-26T20:00:00Z");
-    assert.equal(recap.zoneToday(now, "Pacific/Auckland"), "2026-09-27");
-    assert.equal(recap.zoneToday(now, "America/New_York"), "2026-09-26");
+    assert.equal(sd.zoneToday(now, "Pacific/Auckland"), "2026-09-27");
+    assert.equal(sd.zoneToday(now, "America/New_York"), "2026-09-26");
   });
 });
 

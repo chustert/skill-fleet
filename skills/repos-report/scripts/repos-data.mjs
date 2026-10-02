@@ -8,8 +8,9 @@
  * --no-fetch skips both. GitHub access goes through `gh` and is read-only.
  * The script never creates, removes, or switches a branch or worktree.
  *
- * Nothing here names a project. The skill reads the local paths and the board
- * from the project's docs/agents/issue-tracker.md and passes them as flags.
+ * Nothing here names a project. The skill reads the local paths, the board, and
+ * the sprint time zone from the project's docs/agents/issue-tracker.md and
+ * passes them as flags.
  * The issue map reuses the sibling sprint-status collector, so both skills
  * agree on the board, the sprint, and the lifecycle statuses. Only Node's
  * standard library is used.
@@ -584,18 +585,20 @@ export function renderOverview(data) {
 }
 
 const USAGE = `Usage: node repos-data.mjs --owner <owner> --project <number or exact title>
-  [--path <local path> ...] [--active-days N] [--no-fetch] [--date YYYY-MM-DD]
-  [--status-field <name>] [--iteration-field <name>] [--todo-status <name>]
-  [--started-status <name>] [--review-status <name>] [--done-status <name>]
-  [--format json|overview]
+  [--path <local path> ...] [--active-days N] [--no-fetch] [--timezone <IANA zone>]
+  [--date YYYY-MM-DD] [--status-field <name>] [--iteration-field <name>]
+  [--todo-status <name>] [--started-status <name>] [--review-status <name>]
+  [--done-status <name>] [--format json|overview]
        node repos-data.mjs --no-sprint [--path <local path> ...] [--active-days N] [--no-fetch]
-  [--format json|overview]
+  [--timezone <IANA zone>] [--format json|overview]
        node repos-data.mjs --from-json <file> [--format json|overview]
 
 Each --path is a local path from the routing table in docs/agents/issue-tracker.md,
 relative to the current folder. Omit it to report on the current folder's
 repository alone. The board is the one that file names; --no-sprint skips the
-issue map and needs no board.
+issue map and needs no board. Pass that file's sprint time zone as --timezone.
+Without it or --date, today's date comes from this machine's clock and the
+script warns.
 
 --format overview prints the at-a-glance tables instead of JSON. --from-json
 reads the JSON an earlier run saved instead of collecting it again.`;
@@ -611,6 +614,7 @@ export function parseArgs(argv) {
         "no-fetch": { type: "boolean", default: false },
         "no-sprint": { type: "boolean", default: false },
         date: { type: "string" },
+        timezone: { type: "string" },
         owner: { type: "string" },
         project: { type: "string" },
         "status-field": { type: "string", default: "Status" },
@@ -659,13 +663,15 @@ export function parseArgs(argv) {
     activeDays: Number(values["active-days"]),
     fetch: !values["no-fetch"],
     date: values.date ? isoDate(values.date, "--date") : null,
+    timezone: values.timezone === undefined ? null : sprintData.checkTimeZone(values.timezone),
     board,
     format,
   };
 }
 
-export function collect(args, root = process.cwd()) {
-  const today = args.date ?? localDate(new Date());
+export function collect(args, root = process.cwd(), now = new Date()) {
+  const { today, timezone, timezoneDefaulted } = sprintData.sprintToday(args.date, args.timezone, now);
+  if (timezoneDefaulted) sprintData.io.warn(sprintData.MACHINE_CLOCK);
   const me = sprintData.viewerLogin();
   const lookup = issueLookup();
 
@@ -700,6 +706,8 @@ export function collect(args, root = process.cwd()) {
   return {
     generatedFor: me,
     today,
+    timezone,
+    timezoneDefaulted,
     activeDays: args.activeDays,
     fetched: args.fetch,
     skippedRepositories: skipped,

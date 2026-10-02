@@ -6,6 +6,7 @@ import * as sd from "../skills/sprint-status/scripts/sprint-data.mjs";
 
 const NAMES = { todo: "Todo", started: "In progress", review: "In review", done: "Done" };
 const realGh = sd.io.gh;
+const realWarn = sd.io.warn;
 const SCRIPT = fileURLToPath(new URL("../skills/sprint-status/scripts/sprint-data.mjs", import.meta.url));
 // Without PATH, a gh call fails to start instead of reaching GitHub.
 const OFFLINE = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== "PATH")),
@@ -109,6 +110,33 @@ describe("iterations", () => {
     assert.equal(sd.addDays("2026-09-21", 13), "2026-10-04");
     assert.throws(() => sd.isoDate("2026-02-30"), sd.UsageError);
     assert.equal(sd.isoDate("2026-02-28"), "2026-02-28");
+  });
+});
+
+describe("today and the time zone", () => {
+  const NOW = new Date("2026-09-26T20:00:00Z");
+
+  test("today follows the time zone, not the machine", () => {
+    assert.equal(sd.zoneToday(NOW, "Pacific/Auckland"), "2026-09-27");
+    assert.equal(sd.zoneToday(NOW, "America/New_York"), "2026-09-26");
+  });
+
+  test("--date comes first, then --timezone, then the machine's clock", () => {
+    assert.deepEqual(sd.sprintToday("2026-09-01", null, NOW),
+      { today: "2026-09-01", timezone: null, timezoneDefaulted: false });
+    assert.deepEqual(sd.sprintToday(null, "Pacific/Auckland", NOW),
+      { today: "2026-09-27", timezone: "Pacific/Auckland", timezoneDefaulted: false });
+    const machine = sd.sprintToday(null, null, NOW);
+    assert.equal(machine.timezoneDefaulted, true);
+    assert.equal(machine.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone ?? null);
+    assert.equal(machine.today, sd.zoneToday(NOW, machine.timezone ?? undefined));
+  });
+
+  test("--timezone takes an IANA name", () => {
+    const base = ["--owner", "acme", "--project", "Board", "--repo", "acme/app"];
+    assert.equal(sd.parseArgs([...base, "--timezone", "Europe/Berlin"]).timezone, "Europe/Berlin");
+    assert.equal(sd.parseArgs(base).timezone, null);
+    assert.throws(() => sd.parseArgs([...base, "--timezone", "Mars/Base"]), /Unknown time zone "Mars\/Base"/);
   });
 });
 
@@ -248,10 +276,16 @@ describe("collection", () => {
   const searches = (calls) => calls.filter((args) => args[0] === "search");
   const run = (...scope) => sd.collect(sd.parseArgs(["--owner", "acme", "--project", "Board", ...scope,
     "--date", "2026-09-26"]));
+  let warnings;
 
-  beforeEach(() => sd.clearCaches());
+  beforeEach(() => {
+    sd.clearCaches();
+    warnings = [];
+    sd.io.warn = (message) => warnings.push(message);
+  });
   afterEach(() => {
     sd.io.gh = realGh;
+    sd.io.warn = realWarn;
     sd.clearCaches();
   });
 
@@ -272,6 +306,26 @@ describe("collection", () => {
     for (const args of searches(calls)) {
       assert.deepEqual(args.filter((arg) => arg.startsWith("--repo=")), ["--repo=acme/app"], args.join(" "));
     }
+  });
+
+  test("the sprint time zone picks today, without a warning", () => {
+    fakeGh(board);
+    // 2026-10-04 is the last day of S2 in UTC, and already 2026-10-05 in Auckland.
+    const out = sd.collect(sd.parseArgs(["--owner", "acme", "--project", "Board", "--repo", "acme/app",
+      "--timezone", "Pacific/Auckland"]), new Date("2026-10-04T12:00:00Z"));
+    assert.deepEqual([out.today, out.timezone, out.timezoneDefaulted], ["2026-10-05", "Pacific/Auckland", false]);
+    assert.equal(out.sprint, null);
+    assert.deepEqual(warnings, []);
+  });
+
+  test("without --timezone or --date, the machine's clock picks today, with a warning", () => {
+    fakeGh(board);
+    const out = sd.collect(sd.parseArgs(["--owner", "acme", "--project", "Board", "--repo", "acme/app"]),
+      new Date("2026-09-26T12:00:00Z"));
+    assert.deepEqual(warnings, [sd.MACHINE_CLOCK]);
+    assert.equal(out.timezoneDefaulted, true);
+    // Every time zone puts this instant inside S2.
+    assert.equal(out.sprint.title, "S2");
   });
 
   test("--all-repos searches every repository the owner has", () => {

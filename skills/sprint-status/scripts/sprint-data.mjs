@@ -7,7 +7,7 @@
  * `read:project` scope.
  *
  * Nothing here names a project. The skill reads the owner, board, repositories,
- * field names, and lifecycle statuses from the project's
+ * field names, lifecycle statuses, and sprint time zone from the project's
  * docs/agents/issue-tracker.md and passes them as flags. The owner can be an
  * organization or a user; the script detects which. Only Node's standard
  * library is used.
@@ -108,8 +108,11 @@ query($owner: String!, $num: Int!) {
 /** A problem the user can fix. The command line prints its message and exits with 1. */
 export class UsageError extends Error {}
 
-/** Swappable in tests: every GitHub call goes through io.gh. */
+/** Swappable in tests: every GitHub call goes through io.gh, and every warning through io.warn. */
 export const io = {
+  warn(message) {
+    process.stderr.write(`Warning: ${message}\n`);
+  },
   gh(args) {
     const res = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
     if (res.error) {
@@ -160,20 +163,57 @@ export function daysBetween(start, end) {
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
 }
 
-export function localToday() {
-  const now = new Date();
+export function checkTimeZone(timeZone) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+  } catch {
+    throw new UsageError(`Unknown time zone ${JSON.stringify(timeZone)}. Use an IANA name, such as Europe/Berlin.`);
+  }
+  return timeZone;
+}
+
+/** The wall-clock fields of an instant in the time zone, or in the machine's zone when it is undefined. */
+export function zoneParts(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"),
+    second: get("second") };
+}
+
+/** Today's date in the time zone, as YYYY-MM-DD. */
+export function zoneToday(now, timeZone) {
+  const p = zoneParts(now, timeZone);
   const pad = (n) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+export const MACHINE_CLOCK = "No --timezone was passed, so today's date comes from this machine's clock, not "
+  + "the sprint time zone in docs/agents/issue-tracker.md.";
+
+/**
+ * The date that picks the sprint: --date, else today in --timezone, else today
+ * on the machine's clock. The caller warns when the machine's clock decides.
+ */
+export function sprintToday(date, timeZone, now = new Date()) {
+  if (date) return { today: date, timezone: timeZone, timezoneDefaulted: false };
+  if (timeZone) return { today: zoneToday(now, timeZone), timezone: timeZone, timezoneDefaulted: false };
+  const machine = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  return { today: zoneToday(now, machine ?? undefined), timezone: machine, timezoneDefaulted: true };
 }
 
 const USAGE = `Usage: node sprint-data.mjs --owner <owner> --project <number or exact title>
-  (--repo <owner/repo> ... | --all-repos) [--status-field <name>]
-  [--iteration-field <name>] [--todo-status <name>] [--started-status <name>]
-  [--review-status <name>] [--done-status <name>] [--date YYYY-MM-DD]
+  (--repo <owner/repo> ... | --all-repos) [--timezone <IANA zone>]
+  [--status-field <name>] [--iteration-field <name>] [--todo-status <name>]
+  [--started-status <name>] [--review-status <name>] [--done-status <name>]
+  [--date YYYY-MM-DD]
 
 The project is the board named in docs/agents/issue-tracker.md. Pass --repo for
 each repository in its routing table. --all-repos covers every repository the
-owner has instead.`;
+owner has instead. Pass that file's sprint time zone as --timezone. Without it
+or --date, today's date comes from this machine's clock and the script warns.`;
 export const REPAIR = "Ask the user to run npx skill-fleet@latest update, which creates or repairs the board. "
   + "It changes the project board on GitHub, so it runs only with the user's approval, after a preview with "
   + "npx skill-fleet@latest update --dry-run.";
@@ -219,6 +259,7 @@ export function parseArgs(argv) {
         "review-status": { type: "string", default: "In review" },
         "done-status": { type: "string", default: "Done" },
         date: { type: "string" },
+        timezone: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -241,6 +282,7 @@ export function parseArgs(argv) {
       done: values["done-status"],
     },
     date: values.date ? isoDate(values.date, "--date") : null,
+    timezone: values.timezone === undefined ? null : checkTimeZone(values.timezone),
   };
 }
 
@@ -473,10 +515,11 @@ export function viewerLogin() {
   return graphql("query { viewer { login } }").data.viewer.login;
 }
 
-export function collect(args) {
-  const today = args.date ?? localToday();
+export function collect(args, now = new Date()) {
+  const { today, timezone, timezoneDefaulted } = sprintToday(args.date, args.timezone, now);
+  if (timezoneDefaulted) io.warn(MACHINE_CLOCK);
   const me = viewerLogin();
-  const result = { generatedFor: me, today, owner: args.owner, statusNames: args.names };
+  const result = { generatedFor: me, today, timezone, timezoneDefaulted, owner: args.owner, statusNames: args.names };
 
   const [board, iterationField, current, upcoming] = resolveIterations(
     args.owner, args.project, today, args.iterationField);

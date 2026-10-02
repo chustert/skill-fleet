@@ -29,6 +29,7 @@ recommend `setup-project` rather than guessing.
 | Status field | `--status-field "<name>"`, when it is not `Status` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Lifecycle statuses | `--todo-status`, `--started-status`, `--review-status`, `--done-status`, when they differ from `Todo`, `In progress`, `In review`, and `Done` |
+| Sprint time zone | `--timezone <IANA zone>`, on every run |
 | Each distinct repository in the routing table's `Repository` column, skipping rows whose `Component` is still `TODO` | `--repo <owner/repo>`, repeated |
 | Default repository, when the routing table has no `Repository` column or every row's `Component` is still `TODO` | `--repo <owner/repo>`, once |
 
@@ -40,7 +41,7 @@ pass the template's placeholder `owner/repo`. The script rejects it.
 Run the script that ships with this skill, from the project root:
 
 ```bash
-node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" --repo <owner/repo> [--repo <owner/repo> ...]
+node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> --repo <owner/repo> [--repo <owner/repo> ...]
 ```
 
 The script needs Node.js 20 or later and the GitHub CLI, and nothing else.
@@ -55,6 +56,13 @@ authenticated user, buckets them by lifecycle status, and pulls the PR review
 queue for the listed repositories, or for all of the owner's with
 `--all-repos`. Pass `--date YYYY-MM-DD` to report on a different sprint.
 
+Today's date picks the sprint, and the script reads it in the time zone passed
+with `--timezone`. When the sprint time zone setting is `TODO`, ask the user for
+a time zone. Without `--timezone` or `--date`, the script reads the date from
+the machine's clock, writes a warning to stderr, and sets `timezoneDefaulted`
+to `true`. The machine's date can differ from the team's and pick the wrong
+sprint.
+
 If it exits asking for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project` — do not try to work around it. If it reports
 that it found no board with that title, or several, or that the board has no
@@ -67,6 +75,7 @@ Read the JSON before writing anything. The fields that matter:
 
 | Field | Meaning |
 | --- | --- |
+| `today` / `timezone` | The date that picked the sprint, and the time zone it was read in. `timezoneDefaulted` is `true` when the machine's clock decided |
 | `sprint` | Active iteration, with `day` N of `duration`. `null` when no iteration contains today |
 | `upcoming` | The next iterations. When `sprint` is `null` and this is empty, the board's sprints have run out: tell the user to add iterations in the board's Sprint field settings |
 | `sprintItems.inProgress` / `.inReview` / `.todo` | The user's open items in this sprint |
@@ -151,7 +160,8 @@ Terminal markdown, tight, in this order. Drop any section that is empty except
 **Needs your review** and **Outstanding**, which should say "nothing" explicitly.
 Use the board's own status names in headings when they differ from the defaults.
 When no iteration contains today, say so under the board's title instead of the
-sprint heading.
+sprint heading. When `timezoneDefaulted` is `true`, say under the heading that
+the machine's clock picked the sprint, because no sprint time zone was passed.
 
 Every issue and PR reference is a markdown link to its `url`, per the
 [GitHub reference rules](../../references/github-references.md).

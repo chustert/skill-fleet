@@ -219,6 +219,12 @@ describe("arguments", () => {
     assert.throws(() => rd.parseArgs(["--no-sprint", "--active-days", "two"]), sd.UsageError);
     assert.throws(() => rd.parseArgs(["--no-sprint", "--date", "2026-02-30"]), sd.UsageError);
   });
+
+  test("--timezone takes an IANA name", () => {
+    assert.equal(rd.parseArgs(["--no-sprint", "--timezone", "Europe/Berlin"]).timezone, "Europe/Berlin");
+    assert.equal(rd.parseArgs(["--no-sprint"]).timezone, null);
+    assert.throws(() => rd.parseArgs(["--no-sprint", "--timezone", "Mars/Base"]), /Unknown time zone "Mars\/Base"/);
+  });
 });
 
 /**
@@ -449,5 +455,25 @@ describe("a clone with branches in every state", () => {
     assert.match(report.sprint.error, /Ask the user to run npx skill-fleet@latest update/);
     assert.match(report.sprint.error,
       /only with the user's approval, after a preview with npx skill-fleet@latest update --dry-run\./);
+  });
+
+  test("the sprint time zone picks today; without it the machine's clock does, with a warning", () => {
+    const realWarn = sd.io.warn;
+    const warnings = [];
+    sd.io.warn = (message) => warnings.push(message);
+    try {
+      // Already 2026-10-02 in Auckland, still 2026-10-01 in UTC.
+      const now = new Date("2026-10-01T12:00:00Z");
+      const zoned = rd.collect(rd.parseArgs(["--no-sprint", "--no-fetch", "--path", "app",
+        "--timezone", "Pacific/Auckland"]), dir, now);
+      assert.deepEqual([zoned.today, zoned.timezone, zoned.timezoneDefaulted],
+        ["2026-10-02", "Pacific/Auckland", false]);
+      assert.deepEqual(warnings, []);
+      const machine = rd.collect(rd.parseArgs(["--no-sprint", "--no-fetch", "--path", "app"]), dir, now);
+      assert.equal(machine.timezoneDefaulted, true);
+      assert.deepEqual(warnings, [sd.MACHINE_CLOCK]);
+    } finally {
+      sd.io.warn = realWarn;
+    }
   });
 });

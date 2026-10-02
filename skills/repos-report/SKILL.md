@@ -27,6 +27,7 @@ them to flags:
 | Status field | `--status-field "<name>"`, when it is not `Status` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Lifecycle statuses | `--todo-status`, `--started-status`, `--review-status`, `--done-status`, when they differ from `Todo`, `In progress`, `In review`, and `Done` |
+| Sprint time zone | `--timezone <IANA zone>`, on every run |
 
 The board is required: if the settings name none, say so and ask the user to
 run `npx skill-fleet@latest update`, which creates or repairs the board. It
@@ -42,7 +43,7 @@ JSON, then render the at-a-glance tables from it, so the data is collected only
 once:
 
 ```bash
-node .agents/skills/repos-report/scripts/repos-data.mjs --owner <owner> --project "<board title>" [--path <local path> ...] > /tmp/repos-report.json
+node .agents/skills/repos-report/scripts/repos-data.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> [--path <local path> ...] > /tmp/repos-report.json
 node .agents/skills/repos-report/scripts/repos-data.mjs --from-json /tmp/repos-report.json --format overview
 ```
 
@@ -68,6 +69,13 @@ Flags:
 | `--active-days N` | Unmerged commits newer than N days count as active (default 14) |
 | `--no-sprint` | Skip the issue map, when the user asks only about branches. Needs no board flags |
 | `--date YYYY-MM-DD` | Map the issues of the sprint that contains this date |
+
+Today's date picks the sprint and the active window, and the script reads it in
+the time zone passed with `--timezone`. When the sprint time zone setting is
+`TODO`, ask the user for a time zone. Without `--timezone` or `--date`, the
+script reads the date from the machine's clock, writes a warning to stderr, and
+sets `timezoneDefaulted` to `true`. Say so in the report, because the machine's
+date can differ from the team's and pick the wrong sprint.
 
 When `sprint.error` asks for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project`. When it says the board is missing, is
