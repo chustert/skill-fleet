@@ -183,6 +183,14 @@ describe("install", () => {
     assert.ok(exists(project, ".cursor/skills/tdd/SKILL.md"));
   });
 
+  test("an installation whose check fails still names the next steps", async () => {
+    write(project, ".agents/skills/House_Style/SKILL.md", "---\nname: House_Style\ndescription: Mine.\n---\n\nBody.\n");
+    const { code, output } = await install();
+    assert.equal(code, 1, output);
+    assert.match(output, /found problems:\n- House_Style: name must be lowercase words/);
+    assert.match(output, /Next:.*setup-project/);
+  });
+
   test("an update notes paths in .agents/skills/ that the fleet does not manage", async () => {
     await install();
     write(project, ".agents/skills/sprint-status/scripts/old-collector.mjs", "// left over\n");
@@ -190,8 +198,8 @@ describe("install", () => {
     write(project, ".agents/skills/house-style/SKILL.md", "---\nname: house-style\ndescription: The project's own skill.\n---\n\nBody.\n");
     const { code, output } = await run(["update", project, "--yes"]);
     assert.equal(code, 0, output);
-    assert.match(output, /the fleet does not manage these paths in \.agents\/skills\/:\n {2}\.agents\/skills\/house-notes\/\n {2}\.agents\/skills\/house-style\/\n {2}\.agents\/skills\/sprint-status\/scripts\/old-collector\.mjs\n/);
-    assert.match(output, /A path left over from an earlier copy of the fleet can be deleted\. A project's own skill can stay\./);
+    assert.match(output, /the fleet does not manage these skill paths:\n {2}\.agents\/skills\/house-notes\/\n {2}\.agents\/skills\/house-style\/\n {2}\.agents\/skills\/sprint-status\/scripts\/old-collector\.mjs\n/);
+    assert.match(output, /A path left over from an earlier copy of the fleet can be deleted\. A project's own skill can stay, unless it does the same job as a fleet skill, which setup-project checks\. In \.agents\/skills\/, its frontmatter and links are checked like the fleet's\./);
     assert.doesNotMatch(output, /found problems/);
     assert.ok(exists(project, ".agents/skills/sprint-status/scripts/old-collector.mjs"));
     assert.equal(exists(project, ".claude/skills/house-style"), false);
@@ -829,9 +837,9 @@ describe("check and list", () => {
     assert.deepEqual(checks.unmanaged(project), [".agents/skills/house-style/", ".agents/skills/tdd/scripts/old-helper.mjs"]);
     const passed = await run(["check", project]);
     assert.equal(passed.code, 0, passed.output);
-    assert.match(passed.output, /^Note: the fleet does not manage these paths in \.agents\/skills\/:$/m);
+    assert.match(passed.output, /^Note: the fleet does not manage these skill paths:$/m);
     assert.match(passed.output, /^ {2}\.agents\/skills\/house-style\/$/m);
-    assert.match(passed.output, /^A path left over from an earlier copy of the fleet can be deleted\. A project's own skill can stay\.$/m);
+    assert.match(passed.output, /^A path left over from an earlier copy of the fleet can be deleted\. A project's own skill can stay, unless it does the same job as a fleet skill, which setup-project checks\. In \.agents\/skills\/, its frontmatter and links are checked like the fleet's\.$/m);
     const standalone = spawnSync(process.execPath, [path.join(project, ".agents/scripts/check-skills.mjs")],
       { encoding: "utf8" });
     assert.equal(standalone.status, 0, standalone.stderr);
@@ -839,7 +847,7 @@ describe("check and list", () => {
     fs.unlinkSync(path.join(project, ".cursor/skills/tdd/SKILL.md"));
     const failed = await run(["check", project]);
     assert.equal(failed.code, 1);
-    assert.match(failed.output, /does not manage these paths/);
+    assert.match(failed.output, /does not manage these skill paths/);
     assert.match(failed.output, /missing cursor adapter for tdd/);
   });
 
@@ -860,14 +868,29 @@ describe("check and list", () => {
     assert.ok(checks.check(project).includes("cursor adapter for implement differs from the canonical skill"));
   });
 
-  test("missing and stray adapters are reported", () => {
+  test("missing and stray adapters are reported, and a skill only a tool has gets a note", () => {
     fs.unlinkSync(path.join(project, ".claude/skills/teach/SKILL.md"));
-    const stray = path.join(project, ".claude/skills/old-skill/SKILL.md");
-    fs.mkdirSync(path.dirname(stray));
-    fs.writeFileSync(stray, "stray");
+    // A stray adapter the manifest records, such as one for a skill the fleet dropped.
+    write(project, ".claude/skills/old-skill/SKILL.md", "stray");
+    const manifest = JSON.parse(read(project, checks.MANIFEST));
+    manifest.files[".claude/skills/old-skill/SKILL.md"] = checks.sha256("stray");
+    fs.writeFileSync(path.join(project, checks.MANIFEST), JSON.stringify(manifest));
+    write(project, ".claude/skills/tdd/notes.md", "Notes.\n");
+    write(project, ".claude/skills/deploy-notes/SKILL.md", "---\nname: deploy-notes\ndescription: Claude only.\n---\n\nBody.\n");
     const errors = checks.check(project);
     assert.ok(errors.includes("missing claude adapter for teach"));
     assert.ok(errors.includes("unexpected claude skill file: .claude/skills/old-skill/SKILL.md"));
+    assert.ok(errors.includes("unexpected claude skill file: .claude/skills/tdd/notes.md"));
+    assert.ok(!errors.some((e) => e.includes("deploy-notes")), errors.join("\n"));
+    assert.deepEqual(checks.unmanaged(project), [".claude/skills/deploy-notes/"]);
+  });
+
+  test("links are checked in a project's own skills, not in files left in a fleet skill's folder", () => {
+    write(project, ".agents/skills/tdd/old/readme.md", "[gone](../../../docs/missing.md)\n");
+    assert.deepEqual(checks.check(project), []);
+    write(project, ".agents/skills/house-style/SKILL.md",
+      "---\nname: house-style\ndescription: The project's own skill.\n---\n\n[gone](../../../docs/missing.md)\n");
+    assert.deepEqual(checks.check(project), [".agents/skills/house-style/SKILL.md: broken link to ../../../docs/missing.md"]);
   });
 
   test("a broken reference link is reported", () => {
