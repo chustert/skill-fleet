@@ -61,9 +61,10 @@ drive the UI or to start a local server. Either way, report the gap. Then use
 an approved lower seam that a harness reaches, or use the strongest local
 evidence the component offers as the red and green observations: a request
 against the local route, a CLI run, a scripted play-test step, or a browser or
-simulator check. Record the exact command or steps for both observations. Name the missing harness in the handoff so a separate issue can
-add one. If the behaviour cannot be observed locally at all, return the
-test-foundation work to issue planning.
+simulator check. Record the exact command or steps for both observations. Name
+the missing harness in the handoff so a separate issue can add one. If the
+behaviour cannot be observed locally at all, return the test-foundation work to
+issue planning.
 
 ## Write tests worth keeping
 

@@ -31,10 +31,10 @@ them to flags:
 The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
 `--all-repos` instead of `--repo` only when the user asks for every repository
 of the owner. Never pass the template's placeholder `owner/repo`. The script
-rejects it. If another
-value the command needs is still `TODO`, say so and recommend `setup-project`
-rather than guessing. The board is required: if the settings name none, ask the
-user to run `npx skill-fleet@latest update --dry-run` and then
+rejects it. If another value the command needs is still `TODO`, say so and
+recommend `setup-project` rather than guessing. The board is required: if the
+settings name none, ask the user to run
+`npx skill-fleet@latest update --dry-run` and then
 `npx skill-fleet@latest update` in their own terminal. The update creates or
 repairs the project board on GitHub. Do not run it yourself without the user's
 approval. When the user asks you to run it, follow [Updating the
