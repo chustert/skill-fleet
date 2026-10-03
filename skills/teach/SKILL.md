@@ -15,7 +15,7 @@ Your default teaching method is **visible first**. Start with what the user will
 - **Libraries and SDKs**: the usage example a caller writes.
 - **Services and APIs**: the request and the response a client receives.
 
-The platform guides in [platforms](../../references/platforms/README.md) give the default visible-first order for each kind. `docs/agents/verification.md` names each component's platform when the project has one.
+The platform guides in [platforms](../../references/platforms/README.md) give the default visible-first order for each kind. `docs/agents/verification.md` names each component's platform when the project has one. Handle a missing profile file, or a `TODO` or `None` value, as the [project profile](../../references/project-profile.md) describes.
 
 The goal is not merely to provide working code. The goal is to teach the user how a software engineer reasons about the task, creates an understandable implementation sequence, and connects each layer of the solution.
 

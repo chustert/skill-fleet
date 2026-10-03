@@ -16,9 +16,14 @@ unless the user separately and explicitly authorized that exact action.
 
 ### Establish the exact change
 
-1. Read the applicable repository instructions, the routing table and default
-   base branch in `docs/agents/issue-tracker.md`, and the settings in
-   `docs/agents/verification.md` for each affected component.
+1. Read the applicable repository instructions, with any nested instructions
+   for the changed paths, and the documents in the reading order of
+   `docs/agents/domain.md`, including the guide or `README.md` for each
+   affected component. Also read the routing table and default base branch in
+   `docs/agents/issue-tracker.md`, and each affected component's settings in
+   `docs/agents/verification.md`. Handle a missing profile file, or a `TODO`
+   or `None` value, as the
+   [project profile](../../references/project-profile.md) describes.
 2. Identify the repository, remote, current branch, intended base branch, and
    whether the repositories involved have independent Git histories. The base
    is the default base branch from the tracker settings unless the user names
@@ -63,9 +68,11 @@ unless the user separately and explicitly authorized that exact action.
   combinations that must keep working, the rollout and rollback order, and any
   migration, backfill, reindex, data conversion, environment variable, or
   release it needs.
-- State which steps merging does not perform, such as applying a migration to a
-  hosted database, submitting an app build, or publishing a package, and which
-  merges deploy automatically. Do not perform those steps as part of this skill.
+- State what merging triggers for each affected component, as its `Deploys`
+  row in `docs/agents/verification.md` records, such as an automatic
+  deployment. Also state which steps merging does not perform, such as applying
+  a migration to a hosted database, submitting an app build, or publishing a
+  package. Do not perform those steps as part of this skill.
 - Recommend splitting the PR when a migration, the code that uses it, and a
   later cleanup cannot safely ship together.
 
@@ -77,7 +84,9 @@ unless the user separately and explicitly authorized that exact action.
   before creation. Do not block solely on an arbitrary line-count threshold.
 - Check that the implementation matches the issue and that documentation,
   tests, migration notes, compatibility, rollout, and rollback are addressed
-  where relevant.
+  where relevant. Judge the documentation against the guides read in step 1,
+  and flag any guide whose description of behaviour, commands, or setup the
+  diff makes wrong.
 - Run safe, relevant local verification from `docs/agents/verification.md` in
   proportion to risk. Ask before destructive resets, hosted-environment tests,
   deployments, or other external state changes. Never claim an unrun check
@@ -220,8 +229,12 @@ Immediately before creating or updating the PR:
    applicable boards, has no in-review option, or cannot be updated, stop rather
    than adding it to a board or guessing; report the unresolved status clearly
    while keeping the verified PR intact. If the settings name no board, or
-   GitHub no longer has it, say so and tell the user to run
-   `npx skill-fleet@latest update`, which creates or repairs the board.
+   GitHub no longer has it, say so and ask the user to run
+   `npx skill-fleet@latest update --dry-run` and then
+   `npx skill-fleet@latest update` in their own terminal. The update creates or
+   repairs the project board on GitHub. Do not run it yourself without the
+   user's approval. When the user asks you to run it, follow [Updating the
+   installation](../../references/project-profile.md#updating-the-installation).
 
 If creation fails or GitHub reports an existing PR, do not retry in a way that
 could create duplicates. Report the exact state and propose the smallest next

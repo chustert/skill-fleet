@@ -23,8 +23,27 @@ has all of the following, and the installer (`npx skill-fleet`) sets them up:
   `In progress`, `prepare-pr` to `In review`. GitHub's built-in project
   workflow moves closed issues to `Done`.
 
-When the board is missing or incomplete, a skill stops and tells the user to
-run `npx skill-fleet@latest update`, which creates or repairs it.
+## Updating the installation
+
+When a skill finds the board missing or incomplete, it asks the user to run
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub and updates the fleet's files, so an agent
+never runs it, or `install`, without the user's approval. If the user asks the
+agent to run the update, the agent runs
+`npx skill-fleet@latest update --dry-run --yes` and shows the user the plan it
+prints. If that dry run fails, the agent shows the user why and stops. Only
+after the user approves that exact plan does the agent run
+`npx skill-fleet@latest update --yes`, with the same flags as the dry run. When
+the user makes a choice, such as the board to use or the tools that get
+adapters, the agent passes it to both runs as a flag, such as
+`--board <number>` or `--tools claude,cursor`. Adding `--force`, which
+overwrites files changed by hand, needs its own approval.
+
+Both of the agent's runs take `--yes`, so the dry run plans what the real run
+does. In a terminal the update asks questions, such as which board to link, and
+without one it answers them itself. A dry run in the user's terminal can
+therefore plan a different board than the agent's run would use.
 
 ## Where things live
 
@@ -38,8 +57,8 @@ repository keeps its own Git history.
 | `AGENTS.md` | project, except one section | Always-relevant instructions, working rules, and safety rules. The profile does not restate it. The fleet installer creates it when missing and maintains only the section between the `skill-fleet:begin` and `skill-fleet:end` markers. |
 | `CLAUDE.md` | project, except one section | Imports `AGENTS.md` for Claude Code with `@AGENTS.md`. The installer creates it, or adds the import, when Claude Code is an installed tool. |
 | `docs/agents/issue-tracker.md` | project | Tracker settings, the project board and its lifecycle statuses, branch conventions, and the routing table that maps each component to its repository, local path, and responsibilities. The installer creates it with every setting it reads from GitHub; `setup-project` adds the routing and labels. |
-| `docs/agents/domain.md` | project | The knowledge reading order, glossary, architecture, contracts document, known boundaries, ADR location, and the project's quality weighting. |
-| `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence, and prerequisites. Also the online and paid services that need approval, protected files, and review-worktree setup. |
+| `docs/agents/domain.md` | project | The knowledge reading order, glossary, architecture, contracts document, known boundaries and how to check each one locally, ADR location, and the project's quality weighting. |
+| `docs/agents/verification.md` | project | For every component: platform, test harness, focused and final commands, local run, runtime evidence for each entry point, prerequisites, and what a merge or release deploys. Also the online and paid services that need approval, protected files, and review-worktree setup. |
 | `.agents/references/` | fleet | Shared models every project uses: this file, the software-quality characteristics, the GitHub reference rules, and the platform guides. Change them in the fleet and reinstall; do not edit them in a project. |
 
 The templates for the three profile files and for a new `AGENTS.md` live in
@@ -73,7 +92,8 @@ The templates for the three profile files and for a new `AGENTS.md` live in
 3. `None` is a real value. The project deliberately has no glossary, no
    contracts document, or no test harness. Skip the step that depends on it and
    report it as not configured, not as a failure. The board rows never allow
-   `None`: without a board, stop and recommend `npx skill-fleet@latest update`.
+   `None`. Without a board, stop and ask the user to update the installation,
+   as [Updating the installation](#updating-the-installation) describes.
 4. When the profile and the live system disagree, such as a renamed board or a
    removed command, trust the live evidence, report the disagreement, and
    propose the profile correction. Do not edit the profile silently from
@@ -81,6 +101,14 @@ The templates for the three profile files and for a new `AGENTS.md` live in
 5. Never carry a value from one project's profile into another project.
 6. If a profile file a step needs is missing, say so and fall back to the
    repository's own documentation for that step: `AGENTS.md`, `README.md`,
-   `CONTRIBUTING.md`, and CI configuration. Recommend `setup-project`. A step
-   that changes the tracker, such as creating an issue or moving a status,
-   stops instead of guessing its target.
+   `CONTRIBUTING.md`, the documentation index, the testing and development
+   guides, and CI configuration. Recommend `setup-project`. A step that changes
+   the tracker, such as creating an issue or moving a status, stops instead of
+   guessing its target.
+7. Until `docs/agents/verification.md` lists the protected files, because the
+   file is missing or the list is still `TODO`, treat these as protected:
+   ignored `.env` files other than committed examples, signing files and
+   keystores, service-account JSON files, cloud credential files, `*.tfvars`,
+   and any file the protected-file rules in `AGENTS.md` name. Find them by name
+   only, using `git check-ignore` and `git ls-files` to tell an ignored local
+   file from a committed example. Never open one to find out what it holds.

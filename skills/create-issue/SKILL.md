@@ -132,7 +132,8 @@ Otherwise use the routing table in `docs/agents/issue-tracker.md`:
 - Route to a component the profile marks as legacy or inactive only when the
   user explicitly targets it.
 - When the owner remains uncertain, use the fallback repository from the
-  tracker settings. Do not guess another repository.
+  tracker settings, and name the components that may be involved in the
+  Description or Additional Context. Do not guess another repository.
 
 Create one issue by default. Follow the profile's rule for work that spans
 components, such as a single issue or an umbrella issue. Do not create
@@ -288,8 +289,12 @@ Resolve all required metadata before creating the issue:
    owned by the named owner, its status field, and the exact option mapped to
    the new-issue lifecycle role, usually `Todo`. Resolve every project, field,
    and option ID dynamically; never hard-code one. The board is required: if the
-   settings name none, or GitHub no longer has it, stop and tell the user to run
-   `npx skill-fleet@latest update`, which creates or repairs the board.
+   settings name none, or GitHub no longer has it, stop and ask the user to run
+   `npx skill-fleet@latest update --dry-run` and then
+   `npx skill-fleet@latest update` in their own terminal. The update creates or
+   repairs the project board on GitHub. Do not run it yourself without the
+   user's approval. When the user asks you to run it, follow [Updating the
+   installation](../../references/project-profile.md#updating-the-installation).
 6. If the user supplied a parent, resolve it to an unambiguous issue URL and
    verify that it exists. The new issue must be added as a sub-issue of that
    parent. A full URL or repository-qualified reference is authoritative. A
@@ -331,7 +336,7 @@ started status; assignment and that lifecycle transition belong to
 
 ## Verify the created issue
 
-Read the issue and, when configured, its board item back from GitHub. Confirm:
+Read the issue and its board item back from GitHub. Confirm:
 
 - the URL points to the intended repository and issue number;
 - the issue is open and its title and body match the final draft;
@@ -360,10 +365,12 @@ every other GitHub object the reply names, including the parent issue,
 sub-issues, and any issue or pull request cited as grounding. Inside the issue
 body itself, use the plain `#number` or `owner/repo#number` autolink instead.
 
-Also report the repository and owning component, selected form, issue type when
-one applies, labels, board status, parent and
-sub-issue relationship when present, the project sources used to ground added
-factual claims, and any attachment or configuration that could not be applied.
+Also report the repository and owning component, selected form, issue type
+when one applies, labels, board status, parent and sub-issue relationship when
+present, the project sources used to ground added factual claims, and any
+attachment or configuration that could not be applied. When the owner is
+uncertain, report the components that may be involved instead of the owning
+component.
 
 Stop after creation and verification. Do not start implementation, create a
 branch, assign anyone, move the issue to the started status, add comments, or

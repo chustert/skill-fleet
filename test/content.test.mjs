@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 import * as checks from "../lib/check-skills.mjs";
-import { ROOT, skillNames } from "../lib/install.mjs";
+import { agentsBlock, ROOT, skillNames } from "../lib/install.mjs";
+import { REPAIR } from "../skills/sprint-status/scripts/sprint-data.mjs";
 
 const SKILLS = skillNames();
 const PLATFORMS = ["web", "mobile", "desktop", "game", "service", "library-cli"];
@@ -13,6 +14,10 @@ const GUIDE_SECTIONS = ["## Test seams", "## Runtime evidence", "## Bug feedback
 // users/ segments of board URLs, and the credited author of a borrowed pattern.
 const GITHUB_OWNER = /(?<![\w.-])github\.com[:/]([\w.-]+)/g;
 const ALLOWED_OWNERS = new Set(["owner", "acme", "orgs", "users", "mattpocock"]);
+// An IANA time zone name, by the areas the tz database uses, including its old country links such as US/Eastern.
+const TIME_ZONE = /\b(?:Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific|Etc|US|Canada|Brazil|Mexico|Chile)\/[A-Z][A-Za-z_+-]*(?:\/[A-Z][A-Za-z_+-]*)?/g;
+// The tracker template's example zone, which the time zone check's error message repeats.
+const ALLOWED_ZONES = new Set(["Europe/Berlin"]);
 
 /** Files the package ships, with forward-slash paths relative to the fleet. */
 function shippedFiles() {
@@ -20,6 +25,34 @@ function shippedFiles() {
     checks.listFiles(path.join(ROOT, base))
       .filter((file) => /\.(md|mjs|yaml)$/.test(file))
       .map((file) => `${base}/${file}`));
+}
+
+// The update rule, as "Updating the installation" in the profile reference states it. Every mention of the
+// update repeats the user's run and the approval rule, and states or links the agent's steps.
+const USER_RUN = "`npx skill-fleet@latest update --dry-run` and then `npx skill-fleet@latest update` in their own terminal";
+const APPROVAL = "without the user's approval";
+const AGENT_STEPS = ["`npx skill-fleet@latest update --dry-run --yes`", "approves that exact plan",
+  "`npx skill-fleet@latest update --yes`", "same flags", "`--force`", "needs its own approval"];
+const UPDATE_LINK = /\(\.\.\/\.\.\/references\/project-profile\.md#updating-the-installation\)|"Updating the installation" in `\.agents\/references\/project-profile\.md`/;
+
+/** The paragraphs and list items of Markdown text, each on one line. */
+function paragraphs(text) {
+  return text.split(/\n\s*\n|\n(?=\s*(?:\d+\.|-) )/).map((block) => block.replace(/\s+/g, " ").trim());
+}
+
+/** What a paragraph that mentions the update lacks of the update rule. */
+function updateRuleGaps(paragraph, { code = true } = {}) {
+  const plain = (phrase) => (code ? phrase : phrase.replaceAll("`", ""));
+  // The bare command, without --dry-run or --yes, comes only as the second half of the user's run.
+  const bare = (code ? /`npx skill-fleet@latest update`/g : /npx skill-fleet@latest update(?! --)/g);
+  const gaps = [];
+  if (paragraph.split(plain(USER_RUN)).length - 1 !== (paragraph.match(bare) ?? []).length) {
+    gaps.push("the user's run with its dry run first");
+  }
+  if (!paragraph.includes(APPROVAL)) gaps.push("the approval rule");
+  const steps = AGENT_STEPS.every((step) => paragraph.includes(plain(step)));
+  if (!steps && !UPDATE_LINK.test(paragraph)) gaps.push("the agent's steps or a link to them");
+  return gaps;
 }
 
 function matchingLines(pattern) {
@@ -46,6 +79,13 @@ describe("content", () => {
     const named = matchingLines((line) =>
       [...line.matchAll(GITHUB_OWNER)].some(([, owner]) => !ALLOWED_OWNERS.has(owner)));
     assert.deepEqual(named, []);
+  });
+
+  test("no time zone ships except the template's example", () => {
+    const named = matchingLines((line) => [...line.matchAll(TIME_ZONE)].some(([zone]) => !ALLOWED_ZONES.has(zone)));
+    assert.deepEqual(named, []);
+    assert.ok(matchingLines((line) => line.includes("`Europe/Berlin`"))
+      .some((found) => found.startsWith("skills/setup-project/templates/issue-tracker.md:")));
   });
 
   test("nothing shipped still depends on Python", () => {
@@ -85,6 +125,41 @@ describe("content", () => {
       for (const [, name] of text.matchAll(/docs\/agents\/([a-z-]+\.md)/g)) referenced.add(name);
     }
     assert.deepEqual([...referenced].filter((name) => !templates.has(name)), []);
+  });
+
+  test("the templates carry the profile fields the skills read", () => {
+    const templates = path.join(ROOT, "skills", "setup-project", "templates");
+    const domain = fs.readFileSync(path.join(templates, "domain.md"), "utf8");
+    const boundaries = domain.slice(domain.indexOf("## Boundaries"));
+    assert.match(boundaries, /^\| Boundary \|.*\| Local check \|$/m);
+    const verification = fs.readFileSync(path.join(templates, "verification.md"), "utf8");
+    assert.match(verification, /^\| Deploys \| /m);
+    for (const [name, field] of [["cross-boundary-contract", "Local check"], ["cross-boundary-contract", "Deploys"],
+      ["verify-work", "Local check"], ["prepare-pr", "Deploys"]]) {
+      const text = fs.readFileSync(path.join(ROOT, "skills", name, "SKILL.md"), "utf8");
+      assert.ok(text.includes(`\`${field}\``), `${name} reads ${field}`);
+    }
+  });
+
+  test("every mention of the update states the user's run, the approval rule, and the agent's steps", () => {
+    const profile = fs.readFileSync(path.join(ROOT, "references/project-profile.md"), "utf8");
+    assert.match(profile, /^## Updating the installation$/m);
+    const mentions = [];
+    for (const file of shippedFiles().filter((name) => name.endsWith(".md"))) {
+      for (const paragraph of paragraphs(fs.readFileSync(path.join(ROOT, file), "utf8"))) {
+        if (paragraph.includes("skill-fleet@latest update")) mentions.push({ where: file, paragraph });
+      }
+    }
+    for (const paragraph of paragraphs(agentsBlock(["claude"]))) {
+      if (paragraph.includes("skill-fleet@latest update")) mentions.push({ where: "agentsBlock()", paragraph });
+    }
+    assert.ok(mentions.length >= 12, `found ${mentions.length} mentions`);
+    for (const { where, paragraph } of mentions) {
+      assert.deepEqual(updateRuleGaps(paragraph), [], `${where}: ${paragraph}`);
+    }
+    assert.deepEqual(updateRuleGaps(REPAIR, { code: false }), [], REPAIR);
+    assert.ok(mentions.some(({ where, paragraph }) => where === "references/project-profile.md"
+      && AGENT_STEPS.every((step) => paragraph.includes(step))), "the profile reference states the agent's steps");
   });
 
   test("the fleet and every borrowed skill carry an MIT licence", () => {

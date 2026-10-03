@@ -1,6 +1,6 @@
 ---
 name: verify-work
-description: Verify local implementation work against the originating GitHub issue and approved specification using the exact documented project commands, direct runtime evidence for each affected platform, explicit device, hardware, and hosted-service limitations, and boundary compatibility checks, then run pr-review in a fresh-context subagent as a separate code-quality pass. Use after implementation and before pull-request preparation. Observe and report only; never fix, commit, push, deploy, create a pull request, or change issue state.
+description: Verify local implementation work against the originating GitHub issue and approved specification using the exact documented project commands, direct runtime evidence for each affected platform, explicit device, hardware, hosted-service, and paid-API limitations, and boundary compatibility checks, then run pr-review in a fresh-context subagent as a separate code-quality pass. Use after implementation and before pull-request preparation. Observe and report only; never fix, commit, push, deploy, create a pull request, or change issue state.
 ---
 
 # Verify work
@@ -41,7 +41,9 @@ Before running checks:
    `docs/agents/verification.md` and the platform guide it names in
    [platforms](../../references/platforms/README.md). In a workspace of
    independent repositories, also read each affected repository's own
-   `AGENTS.md` and testing documentation.
+   `AGENTS.md` and testing documentation. Handle a missing profile file, or a
+   `TODO` or `None` value, as the
+   [project profile](../../references/project-profile.md) describes.
 4. Convert each acceptance criterion into a concrete observable claim and name
    the strongest locally available evidence for it. Preserve the source wording
    so the final result can be traced back to the issue. Include the criteria
@@ -90,8 +92,8 @@ Assign one result to every criterion:
 - `Pass`: direct evidence demonstrates the specified observable behaviour.
 - `Fail`: direct evidence contradicts the criterion or exposes a blocking error.
 - `Not verified`: required evidence is unavailable, unsafe, ambiguous, or needs
-  credentials, hardware, a human play-test, hosted infrastructure, or
-  authorization not present.
+  credentials, hardware, a human play-test, hosted infrastructure, a paid
+  third-party API, or authorization not present.
 
 Do not use `Pass` for a behavioural or runtime criterion based only on code
 inspection, compilation, a green but unrelated test suite, or an
@@ -111,8 +113,10 @@ and required. Use `Not verified` when the missing part could not be exercised.
 
 For every behaviour change, capture direct local runtime evidence on the
 platform that runs it. Follow the runtime-evidence section of the component's
-platform guide, using the local run command and runtime-evidence method in
-`docs/agents/verification.md`. Across every platform:
+platform guide, using the local run command and the `Runtime evidence` row in
+`docs/agents/verification.md`. That row may list one method per entry point,
+such as pages, a public API, and a script embedded by other sites. Gather
+evidence at every entry point the change touches. Across every platform:
 
 1. Start or reuse the local services with the documented commands. Check the
    health of a running service before starting a duplicate.
@@ -147,17 +151,22 @@ Keep these evidence categories separate in the report:
   generic build or an editor measurement.
 - **Credentials and local configuration:** name the missing configuration
   category without opening, printing, or quoting any protected file listed in
-  `docs/agents/verification.md`.
-- **Online, hosted, and paid services:** every service
-  `docs/agents/verification.md` lists as needing approval, plus any preview,
-  staging, production, remote database, store, platform, or third-party API.
+  `docs/agents/verification.md`, or any other secret-bearing file.
+- **Hosted infrastructure:** the deployments and other online targets listed
+  under `Online, hosted, and paid services` in `docs/agents/verification.md`,
+  plus any other preview, staging, or production environment, any remote
+  database, and any other online service.
+- **Paid third-party APIs:** the paid services listed in the same section, plus
+  any other third-party API that costs money, sends real messages, or acts on
+  real accounts, and its sandbox or test mode. Examples are a payments sandbox,
+  email delivery, an AI API, and a store or platform service.
 
-Local verification does not authorize contacting an online, hosted, or paid
-service. Explain why local evidence is insufficient, name the target, the
-actions, the expected side effects and cost, and obtain explicit permission for
-that specific check. An unavailable simulator, device, hardware, credential, or
-service produces `Not verified` for the affected claim, reported separately from
-test failures and code defects.
+Local verification does not authorize contacting any online service, including
+hosted infrastructure and paid third-party APIs. Explain why local evidence is
+insufficient, name the target, the actions, the expected side effects and cost,
+and obtain explicit permission for that specific check. An unavailable
+simulator, device, hardware, credential, or service produces `Not verified` for
+the affected claim, reported separately from test failures and code defects.
 
 ## Boundary compatibility
 
@@ -166,7 +175,12 @@ boundary between parts that ship or version separately, as listed in
 `docs/agents/domain.md` or found in the code.
 
 Verify every affected component and repository independently, then exercise the
-smallest available compatibility path across the shared boundary. Record:
+smallest available compatibility path across the shared boundary. Start from
+the boundary's `Local check` in the `Boundaries` table of
+`docs/agents/domain.md`, which records how to run both sides together locally.
+When the boundary has no row in the table, or its `Local check` is `None`,
+exercise each combination with old payload fixtures, earlier stored data, or
+earlier builds instead. Record:
 
 - the producer and consumer, and which versions of each can meet during
   rollout, including clients already installed on users' devices;
@@ -174,7 +188,8 @@ smallest available compatibility path across the shared boundary. Record:
 - old-producer/new-consumer and new-producer/old-consumer expectations, and old
   stored data read by the new code, such as an earlier save file or an earlier
   client build against the new server;
-- schema, migration, backfill, seed, auth, offline, and rollback implications;
+- schema, migration, backfill, reindexing, seed, environment-variable, auth,
+  offline, and rollback implications;
 - exact contract or integration evidence obtained; and
 - the safe rollout order and rollback order.
 
@@ -240,8 +255,9 @@ Return one self-contained verification record containing:
 3. **Documented commands:** exact commands and results, grouped by component.
 4. **Runtime evidence:** observations and artifact paths for each platform,
    without embedding sensitive data.
-5. **Limitations:** device, hardware, play-test, credential, and online or paid
-   service results or withheld checks, as separate categories.
+5. **Limitations:** device, hardware, play-test, credential, hosted
+   infrastructure, and paid third-party API results or withheld checks, as
+   separate categories.
 6. **Compatibility:** contract evidence plus rollout and rollback order for
    changes that cross a boundary.
 7. **Code review:** the separate Spec and Engineering Standards results from

@@ -1,6 +1,6 @@
 ---
 name: repos-report
-description: Report every local branch and worktree in each of the project's local repositories, opening with icon-coded at-a-glance tables per repository, then grouped into active work, empty issue branches, other people's work, and dormant branches that are safe to remove or need a decision, plus a map of where each open sprint issue lives locally. Use when the user asks which branches or worktrees are active or dormant, where an issue is being worked on, or what can be cleaned up. Read-only; never removes, switches, or deletes anything.
+description: Report every local branch and worktree in each of the project's local repositories, opening with icon-coded at-a-glance tables per repository, then grouped into active work, empty issue branches, other people's work, and dormant branches that are safe to remove or need a decision, plus a map of where each open sprint issue lives locally. Use when the user asks which branches or worktrees are active or dormant, where an issue is being worked on, or what can be cleaned up. It fetches and prunes remote-tracking refs in each clone unless run with --no-fetch, and changes no local branch, worktree, or working-tree file.
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -15,7 +15,9 @@ and the same icons mark every later section.
 ## 1. Collect the data
 
 Read the tracker settings and the routing table in
-`docs/agents/issue-tracker.md` and map them to flags:
+`docs/agents/issue-tracker.md`, following the
+[rules for reading the profile](../../references/project-profile.md), and map
+them to flags:
 
 | Tracker setting | Flag |
 | --- | --- |
@@ -25,20 +27,25 @@ Read the tracker settings and the routing table in
 | Status field | `--status-field "<name>"`, when it is not `Status` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Lifecycle statuses | `--todo-status`, `--started-status`, `--review-status`, `--done-status`, when they differ from `Todo`, `In progress`, `In review`, and `Done` |
+| Sprint time zone | `--timezone <IANA zone>`, on every run |
 
-The board is required: if the settings name none, say so and tell the user to
-run `npx skill-fleet@latest update`, which creates or repairs it. If another
-value the command needs is still `TODO`, say so and recommend `setup-project`
-rather than guessing. When the routing table has no local paths yet, omit
-`--path`. The script then reports on the project root's repository alone, and
-the report says that other clones may be missing.
+The board is required: if the settings name none, say so and ask the user to
+run `npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+If another value the command needs is still `TODO`, say so and recommend
+`setup-project` rather than guessing. When the routing table has no local paths
+yet, omit `--path`. The script then reports on the project root's repository
+alone, and the report says that other clones may be missing.
 
 Run the script that ships with this skill, from the project root. Save the
 JSON, then render the at-a-glance tables from it, so the data is collected only
 once:
 
 ```bash
-node .agents/skills/repos-report/scripts/repos-data.mjs --owner <owner> --project "<board title>" [--path <local path> ...] > /tmp/repos-report.json
+node .agents/skills/repos-report/scripts/repos-data.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> [--path <local path> ...] > /tmp/repos-report.json
 node .agents/skills/repos-report/scripts/repos-data.mjs --from-json /tmp/repos-report.json --format overview
 ```
 
@@ -50,10 +57,11 @@ sibling `sprint-status/scripts/sprint-data.mjs` for the board, so keep both
 canonical skill directories together.
 
 A path inside a repository counts as that repository, so components that share
-one clone produce one section. The script runs `git fetch --prune` in each
-clone. When a merged PR's head commit is missing locally, it also fetches
-`refs/pull/<n>/head`. Both only update remote-tracking refs and objects.
-Nothing else is written.
+one clone produce one section. By default the script runs `git fetch --prune`
+in each clone, which updates its remote-tracking refs and deletes those whose
+branch is gone from GitHub. When a merged PR's head commit is missing locally,
+it also fetches `refs/pull/<n>/head`. Neither fetch changes a local branch, a
+worktree, or a file in a checkout. `--no-fetch` skips both.
 
 Flags:
 
@@ -64,11 +72,22 @@ Flags:
 | `--no-sprint` | Skip the issue map, when the user asks only about branches. Needs no board flags |
 | `--date YYYY-MM-DD` | Map the issues of the sprint that contains this date |
 
+Today's date picks the sprint and the active window, and the script reads it in
+the time zone passed with `--timezone`. When the sprint time zone setting is
+`TODO`, ask the user for a time zone. Without `--timezone` or `--date`, the
+script reads the date from the machine's clock, writes a warning to stderr, and
+sets `timezoneDefaulted` to `true`. Say so in the report, because the machine's
+date can differ from the team's and pick the wrong sprint.
+
 When `sprint.error` asks for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project`. When it says the board is missing, is
-ambiguous, or has no iteration field, tell the user to run
-`npx skill-fleet@latest update`. Either way, write the report without the issue
-map and say why it is missing.
+ambiguous, or has no iteration field, ask the user to run
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+Either way, write the report without the issue map and say why it is missing.
 
 ## 2. Read the JSON
 
@@ -162,7 +181,8 @@ When many share a parent folder, name the folder once and list the folder names.
 <Two or three sentences: where real work is in flight, and how much is removable.>
 
 Branches are sorted by PR state, not ahead/behind counts, because squash merges make
-merged branches still look "ahead" of the default branch. Nothing has been removed or changed.
+merged branches still look "ahead" of the default branch. No local branch, worktree, or file has
+been removed or changed.
 
 <At a glance: the --format overview output, verbatim.>
 
@@ -208,7 +228,8 @@ worktrees, missing worktrees to prune, merged branches. Name what to keep until 
 user decides, above all any branch with unpushed commits.>
 ```
 
-This skill only reports. Removing a worktree or branch needs the user's
-separate, explicit approval. When they give it, use non-forcing commands
-(`git worktree remove`, `git worktree prune`, `git branch -d`). Stop and report
-any refusal rather than retrying with `--force` or `-D`.
+Apart from the fetch, this skill only reports. Removing a worktree or branch
+needs the user's separate, explicit approval. When they give it, use
+non-forcing commands (`git worktree remove`, `git worktree prune`,
+`git branch -d`). Stop and report any refusal rather than retrying with
+`--force` or `-D`.

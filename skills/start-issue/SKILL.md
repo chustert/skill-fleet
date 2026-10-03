@@ -334,8 +334,12 @@ to the started status:
    its status field, and the exact option mapped to the started lifecycle role,
    usually `In progress`. Never hard-code project, field, item, or option
    identifiers. If the settings name no board, or GitHub no longer has it, keep
-   the local branches, report that the status was not synchronized, and tell
-   the user to run `npx skill-fleet@latest update`, which creates or repairs the board.
+   the local branches, report that the status was not synchronized, and ask the
+   user to run `npx skill-fleet@latest update --dry-run` and then
+   `npx skill-fleet@latest update` in their own terminal. The update creates or
+   repairs the project board on GitHub. Do not run it yourself without the
+   user's approval. When the user asks you to run it, follow [Updating the
+   installation](../../references/project-profile.md#updating-the-installation).
 6. Read the current status first. If it is the new-issue status, update it to
    the started status. If it is already the started status, verify it without
    issuing a redundant update.

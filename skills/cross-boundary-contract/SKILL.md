@@ -12,12 +12,15 @@ the edit itself touches only one side.
 
 ## Find the boundary
 
-1. Read the root `AGENTS.md`, the known boundaries and contracts document named
-   in `docs/agents/domain.md`, the routing table in
-   `docs/agents/issue-tracker.md`, and the component guide or `README.md` on
-   each side. In a workspace of independent repositories, read each affected
-   repository's own `AGENTS.md` and any nested instructions for the paths
-   involved.
+1. From the reading order in `docs/agents/domain.md`, read the root
+   `AGENTS.md`, the architecture overview, the contracts document, and the
+   component guide or `README.md` on each side. Also read the `Boundaries`
+   table in `docs/agents/domain.md` and the routing table in
+   `docs/agents/issue-tracker.md`. In a workspace of independent repositories,
+   read each affected repository's own `AGENTS.md` and any nested instructions
+   for the paths involved. Handle a missing profile file, or a `TODO` or `None`
+   value, as the [project profile](../../references/project-profile.md)
+   describes.
 2. If the project records no boundary for the area, find it from the code and
    the platform guides in [platforms](../../references/platforms/README.md).
    Typical boundaries are:
@@ -56,10 +59,12 @@ the edit itself touches only one side.
    once nothing deployed depends on it. Version persisted formats and keep a
    reader for every version still in use. For a library, follow its versioning
    policy: a breaking change needs a major version and a migration note.
-6. Keep each intermediate state safe to deploy and to roll back. Note which
-   merges deploy automatically and which steps need an explicit action, such as
-   a remote migration, a store submission, or a package publish. Do not perform
-   those actions as part of this workflow.
+6. Keep each intermediate state safe to deploy and to roll back. Read each
+   affected component's `Deploys` row in `docs/agents/verification.md` for what
+   a merge or release triggers. Note which merges deploy automatically and which
+   steps need an explicit action, such as a remote migration, a store
+   submission, or a package publish. Do not perform those actions as part of
+   this workflow.
 
 ## Implement and verify each side
 
@@ -71,21 +76,29 @@ the edit itself touches only one side.
    reference, changelog, or format notes. Do not use agent files as the only
    technical specification.
 9. Verify each side with its commands in `docs/agents/verification.md`. Then run
-   the smallest local check across the boundary: an old payload fixture against
+   the smallest local check across the boundary. Start from the boundary's
+   `Local check` in the `Boundaries` table of `docs/agents/domain.md`, which
+   records how to run both sides together locally. Cover the version
+   combinations that check does not reach with an old payload fixture against
    the new consumer, an old save file loaded by the new build, or the previous
-   client against the new local server. Do not infer compatibility from two
-   independently green suites. Mark a combination that cannot run locally
-   `Not verified` and name the missing environment or artifact.
+   client against the new local server. When the boundary has no row in the
+   table, or its `Local check` is `None`, cover every combination that way. Do
+   not infer compatibility from two independently green suites. Mark a
+   combination that cannot run locally `Not verified` and name the missing
+   environment or artifact.
 
 ## Report
 
-10. In the plan, the handoff, and each pull request, state the contract before
-    and after, the combinations that must keep working, the rollout and
-    rollback order, any migration, backfill, reindex, data conversion,
-    environment variable, or release it needs, the verification on each side
-    and across the boundary, and any external verification still missing. Link
-    the issue and every related issue or pull request wherever you name it, per
-    the [GitHub reference rules](../../references/github-references.md). Inside
+10. In the plan, the handoff, and each pull request, write a change note. It
+    states the contract before and after, the combinations that must keep
+    working, the rollout and rollback order, any migration, backfill, reindex,
+    data conversion, environment variable, or release it needs, the
+    verification on each side and across the boundary, and any external
+    verification still missing. When the contracts document defines its own
+    change-note template, fill in that template and add any of these items it
+    lacks. Link the issue and every related issue or pull request wherever you
+    name it, per the
+    [GitHub reference rules](../../references/github-references.md). Inside
     GitHub text use the plain `#number` or `owner/repo#number` autolink.
 
 Do not commit, push, deploy, release, publish, or apply a remote migration as

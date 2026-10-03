@@ -219,6 +219,12 @@ describe("arguments", () => {
     assert.throws(() => rd.parseArgs(["--no-sprint", "--active-days", "two"]), sd.UsageError);
     assert.throws(() => rd.parseArgs(["--no-sprint", "--date", "2026-02-30"]), sd.UsageError);
   });
+
+  test("--timezone takes an IANA name", () => {
+    assert.equal(rd.parseArgs(["--no-sprint", "--timezone", "Europe/Berlin"]).timezone, "Europe/Berlin");
+    assert.equal(rd.parseArgs(["--no-sprint"]).timezone, null);
+    assert.throws(() => rd.parseArgs(["--no-sprint", "--timezone", "Mars/Base"]), /Unknown time zone "Mars\/Base"/);
+  });
 });
 
 /**
@@ -227,6 +233,7 @@ describe("arguments", () => {
  */
 describe("a clone with branches in every state", () => {
   const realGh = sd.io.gh;
+  const ghCalls = [];
   let dir;
   let app;
   let shas;
@@ -351,7 +358,10 @@ describe("a clone with branches in every state", () => {
     git(seed, ["push", "-q", url, "main"]);
 
     sd.clearCaches();
-    sd.io.gh = fakeGh;
+    sd.io.gh = (args) => {
+      ghCalls.push(args);
+      return fakeGh(args);
+    };
   });
 
   after(() => {
@@ -426,11 +436,42 @@ describe("a clone with branches in every state", () => {
     assert.ok(out.includes("| ⚪ | no worktree | 1 merged or empty branch | — | — | safe to delete |"));
   });
 
-  test("a board problem leaves the branch report and names the problem", () => {
+  test("the issue map reads the board and searches no owner's repositories", () => {
+    ghCalls.length = 0;
+    const args = rd.parseArgs(["--owner", "acme", "--project", "app Sprints", "--path", "app", "--no-fetch",
+      "--date", TODAY]);
+    assert.equal(rd.collect(args, dir).sprint.issues.length, 4);
+    assert.ok(ghCalls.some((call) => call.join(" ").includes("items(first")));
+    assert.deepEqual(ghCalls.filter((call) => call[0] === "search" || call.some((arg) => arg.startsWith("--owner="))),
+      []);
+  });
+
+  test("a board problem leaves the branch report and asks for the update with approval", () => {
     const args = rd.parseArgs(["--owner", "acme", "--project", "Missing board", "--path", "app", "--no-fetch",
       "--date", TODAY]);
     const report = rd.collect(args, dir);
     assert.equal(report.repositories.length, 1);
-    assert.match(report.sprint.error, /npx skill-fleet@latest update/);
+    assert.ok(report.sprint.error.endsWith(sd.REPAIR), report.sprint.error);
+    assert.match(report.sprint.error, /Ask the user to run npx skill-fleet@latest update --dry-run and then /);
+    assert.match(report.sprint.error, /Do not run it yourself without the user's approval\./);
+  });
+
+  test("the sprint time zone picks today; without it the machine's clock does, with a warning", () => {
+    const realWarn = sd.io.warn;
+    const warnings = [];
+    sd.io.warn = (message) => warnings.push(message);
+    try {
+      // Already 2026-10-02 in Tokyo, still 2026-10-01 in UTC.
+      const now = new Date("2026-10-01T16:00:00Z");
+      const zoned = rd.collect(rd.parseArgs(["--no-sprint", "--no-fetch", "--path", "app",
+        "--timezone", "Asia/Tokyo"]), dir, now);
+      assert.deepEqual([zoned.today, zoned.timezone, zoned.timezoneDefaulted], ["2026-10-02", "Asia/Tokyo", false]);
+      assert.deepEqual(warnings, []);
+      const machine = rd.collect(rd.parseArgs(["--no-sprint", "--no-fetch", "--path", "app"]), dir, now);
+      assert.equal(machine.timezoneDefaulted, true);
+      assert.deepEqual(warnings, [sd.MACHINE_CLOCK]);
+    } finally {
+      sd.io.warn = realWarn;
+    }
   });
 });

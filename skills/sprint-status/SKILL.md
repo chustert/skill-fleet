@@ -12,10 +12,16 @@ in-flight item.
 
 ## 1. Collect the data
 
-Read the tracker settings in `docs/agents/issue-tracker.md` and map them to
-flags. The board is required: if the settings name none, say so and tell the
-user to run `npx skill-fleet@latest update`, which creates or repairs it. If
-another value the command needs is still `TODO`, say so and recommend
+Read the tracker settings and the routing table in
+`docs/agents/issue-tracker.md`, following the
+[rules for reading the profile](../../references/project-profile.md), and map
+them to flags. The board is required: if the settings name none, say so and ask
+the user to run `npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+If another value the command needs is still `TODO`, say so and recommend
 `setup-project` rather than guessing.
 
 | Tracker setting | Flag |
@@ -25,12 +31,19 @@ another value the command needs is still `TODO`, say so and recommend
 | Status field | `--status-field "<name>"`, when it is not `Status` |
 | Iteration field | `--iteration-field "<name>"`, when the board has several |
 | Lifecycle statuses | `--todo-status`, `--started-status`, `--review-status`, `--done-status`, when they differ from `Todo`, `In progress`, `In review`, and `Done` |
-| Each repository in the routing table | `--repo <owner/repo>`, repeated. Omit to cover every repository the owner has. |
+| Sprint time zone | `--timezone <IANA zone>`, on every run |
+| Each distinct repository in the routing table's `Repository` column, skipping rows whose `Component` is still `TODO` | `--repo <owner/repo>`, repeated |
+| Default repository, when the routing table has no `Repository` column or every row's `Component` is still `TODO` | `--repo <owner/repo>`, once |
+
+The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
+`--all-repos` instead of `--repo` only when the user asks for every repository
+of the owner. Never pass the template's placeholder `owner/repo`. The script
+rejects it.
 
 Run the script that ships with this skill, from the project root:
 
 ```bash
-node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" [--repo <owner/repo> ...]
+node .agents/skills/sprint-status/scripts/sprint-data.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> --repo <owner/repo> [--repo <owner/repo> ...]
 ```
 
 The script needs Node.js 20 or later and the GitHub CLI, and nothing else.
@@ -42,19 +55,32 @@ This prints JSON and does all the GitHub work: detects whether the owner is an
 organization or a user, finds the board by its exact title, resolves which
 iteration contains today's date, filters the board to items assigned to the
 authenticated user, buckets them by lifecycle status, and pulls the PR review
-queue for the listed repositories. Pass `--date YYYY-MM-DD` to report on a
-different sprint.
+queue for the listed repositories, or for all of the owner's with
+`--all-repos`. Pass `--date YYYY-MM-DD` to report on a different sprint.
+
+Today's date picks the sprint, and the script reads it in the time zone passed
+with `--timezone`. When the sprint time zone setting is `TODO`, ask the user for
+a time zone. Without `--timezone` or `--date`, the script reads the date from
+the machine's clock, writes a warning to stderr, and sets `timezoneDefaulted`
+to `true`. The machine's date can differ from the team's and pick the wrong
+sprint.
 
 If it exits asking for the `read:project` scope, tell the user to run
 `gh auth refresh -s read:project` — do not try to work around it. If it reports
 that it found no board with that title, or several, or that the board has no
-iteration field, say so, point at the tracker settings, and recommend
-`npx skill-fleet@latest update`; do not substitute another project.
+iteration field, say so and point at the tracker settings. Ask the user to run
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
+Do not substitute another project.
 
 Read the JSON before writing anything. The fields that matter:
 
 | Field | Meaning |
 | --- | --- |
+| `today` / `timezone` | The date that picked the sprint, and the time zone it was read in. `timezoneDefaulted` is `true` when the machine's clock decided |
 | `sprint` | Active iteration, with `day` N of `duration`. `null` when no iteration contains today |
 | `upcoming` | The next iterations. When `sprint` is `null` and this is empty, the board's sprints have run out: tell the user to add iterations in the board's Sprint field settings |
 | `sprintItems.inProgress` / `.inReview` / `.todo` | The user's open items in this sprint |
@@ -77,8 +103,12 @@ code actually is. Keep it to a quick pass — the goal is one or two factual
 sentences per item, not a review.
 
 Find each item's local checkout from the `Local path` column of the routing
-table in `docs/agents/issue-tracker.md`, relative to the project root. Report an
-item whose repository has no local path from GitHub alone.
+table in `docs/agents/issue-tracker.md`, relative to the project root. When the
+table gives the default repository no local path, use the project root, which
+holds `.agents/skills/`, as its checkout, but only if the root's `origin`
+remote is that repository. Otherwise the repository has
+no checkout. A local path of `None` also means no checkout. Report an item
+whose repository has no checkout from GitHub alone.
 
 Useful signals, cheapest first:
 
@@ -135,7 +165,8 @@ Terminal markdown, tight, in this order. Drop any section that is empty except
 **Needs your review** and **Outstanding**, which should say "nothing" explicitly.
 Use the board's own status names in headings when they differ from the defaults.
 When no iteration contains today, say so under the board's title instead of the
-sprint heading.
+sprint heading. When `timezoneDefaulted` is `true`, say under the heading that
+the machine's clock picked the sprint, because no sprint time zone was passed.
 
 Every issue and PR reference is a markdown link to its `url`, per the
 [GitHub reference rules](../../references/github-references.md).

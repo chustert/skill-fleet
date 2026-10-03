@@ -6,10 +6,11 @@
  * whatever account `gh auth status` reports. Board queries need the
  * `read:project` scope.
  *
- * Nothing here names a project. The skill reads the owner, board, field names,
- * and lifecycle statuses from the project's docs/agents/issue-tracker.md and
- * passes them as flags. The owner can be an organization or a user; the script
- * detects which. Only Node's standard library is used.
+ * Nothing here names a project. The skill reads the owner, board, repositories,
+ * field names, lifecycle statuses, and sprint time zone from the project's
+ * docs/agents/issue-tracker.md and passes them as flags. The owner can be an
+ * organization or a user; the script detects which. Only Node's standard
+ * library is used.
  */
 
 import { spawnSync } from "node:child_process";
@@ -107,8 +108,11 @@ query($owner: String!, $num: Int!) {
 /** A problem the user can fix. The command line prints its message and exits with 1. */
 export class UsageError extends Error {}
 
-/** Swappable in tests: every GitHub call goes through io.gh. */
+/** Swappable in tests: every GitHub call goes through io.gh, and every warning through io.warn. */
 export const io = {
+  warn(message) {
+    process.stderr.write(`Warning: ${message}\n`);
+  },
   gh(args) {
     const res = spawnSync("gh", args, { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
     if (res.error) {
@@ -159,20 +163,89 @@ export function daysBetween(start, end) {
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
 }
 
-export function localToday() {
-  const now = new Date();
+export function checkTimeZone(timeZone) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+  } catch {
+    throw new UsageError(`Unknown time zone ${JSON.stringify(timeZone)}. Use an IANA name, such as Europe/Berlin.`);
+  }
+  return timeZone;
+}
+
+/** The wall-clock fields of an instant in the time zone, or in the machine's zone when it is undefined. */
+export function zoneParts(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"),
+    second: get("second") };
+}
+
+/** Today's date in the time zone, as YYYY-MM-DD. */
+export function zoneToday(now, timeZone) {
+  const p = zoneParts(now, timeZone);
   const pad = (n) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+export const MACHINE_CLOCK = "No --timezone was passed, so today's date comes from this machine's clock, not "
+  + "the sprint time zone in docs/agents/issue-tracker.md.";
+
+/**
+ * The date that picks the sprint: --date, else today in --timezone, else today
+ * on the machine's clock. The caller warns when the machine's clock decides.
+ */
+export function sprintToday(date, timeZone, now = new Date()) {
+  if (date) return { today: date, timezone: timeZone, timezoneDefaulted: false };
+  if (timeZone) return { today: zoneToday(now, timeZone), timezone: timeZone, timezoneDefaulted: false };
+  const machine = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  return { today: zoneToday(now, machine ?? undefined), timezone: machine, timezoneDefaulted: true };
 }
 
 const USAGE = `Usage: node sprint-data.mjs --owner <owner> --project <number or exact title>
-  [--repo <owner/repo> ...] [--status-field <name>] [--iteration-field <name>]
-  [--todo-status <name>] [--started-status <name>] [--review-status <name>]
-  [--done-status <name>] [--date YYYY-MM-DD]
+  (--repo <owner/repo> ... | --all-repos) [--timezone <IANA zone>]
+  [--status-field <name>] [--iteration-field <name>] [--todo-status <name>]
+  [--started-status <name>] [--review-status <name>] [--done-status <name>]
+  [--date YYYY-MM-DD]
 
-The project is the board named in docs/agents/issue-tracker.md. Omit --repo to
-cover every repository the owner has.`;
-export const REPAIR = "Run npx skill-fleet@latest update, which creates or repairs the board.";
+The project is the board named in docs/agents/issue-tracker.md. Pass --repo for
+each repository in its routing table. --all-repos covers every repository the
+owner has instead. Pass that file's sprint time zone as --timezone. Without it
+or --date, today's date comes from this machine's clock and the script warns.`;
+// The update rule, worded as .agents/references/project-profile.md words it in "Updating the installation".
+export const REPAIR = "Ask the user to run npx skill-fleet@latest update --dry-run and then "
+  + "npx skill-fleet@latest update in their own terminal. The update creates or repairs the project board on "
+  + "GitHub. Do not run it yourself without the user's approval. If the user asks you to run it, run "
+  + "npx skill-fleet@latest update --dry-run --yes and show the user the plan it prints. Run "
+  + "npx skill-fleet@latest update --yes only after the user approves that exact plan, with the same flags, such "
+  + "as --board or --tools for a choice the user made. Adding --force, which overwrites files changed by hand, "
+  + "needs its own approval.";
+export const SCOPE_REQUIRED = "Pass --repo <owner/repo> for each repository to cover, or --all-repos to cover "
+  + "every repository the owner has.";
+const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const PLACEHOLDER = "owner/repo";
+
+/** The repositories a command covers, each once: the listed ones, or all of the owner's with --all-repos. */
+export function repoScope(repos, allRepos, usage) {
+  if (repos.length && allRepos) throw new UsageError(`Pass either --repo or --all-repos, not both.\n\n${usage}`);
+  if (!repos.length && !allRepos) throw new UsageError(`${SCOPE_REQUIRED}\n\n${usage}`);
+  const distinct = new Map();
+  for (const repo of repos) {
+    if (!REPOSITORY.test(repo)) {
+      throw new UsageError(`--repo takes a repository in the form owner/repo, not ${JSON.stringify(repo)}.`
+        + `\n\n${usage}`);
+    }
+    if (repo.toLowerCase() === PLACEHOLDER) {
+      throw new UsageError(`${PLACEHOLDER} is the routing table's template placeholder. Pass the default repository `
+        + "from docs/agents/issue-tracker.md instead.");
+    }
+    // GitHub names are case-insensitive, so acme/App and acme/app are one repository.
+    if (!distinct.has(repo.toLowerCase())) distinct.set(repo.toLowerCase(), repo);
+  }
+  return { repos: [...distinct.values()], allRepos };
+}
 
 export function parseArgs(argv) {
   let values;
@@ -183,6 +256,7 @@ export function parseArgs(argv) {
         owner: { type: "string" },
         project: { type: "string" },
         repo: { type: "string", multiple: true, default: [] },
+        "all-repos": { type: "boolean", default: false },
         "status-field": { type: "string", default: "Status" },
         "iteration-field": { type: "string" },
         "todo-status": { type: "string", default: "Todo" },
@@ -190,6 +264,7 @@ export function parseArgs(argv) {
         "review-status": { type: "string", default: "In review" },
         "done-status": { type: "string", default: "Done" },
         date: { type: "string" },
+        timezone: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -202,7 +277,7 @@ export function parseArgs(argv) {
   return {
     owner: values.owner,
     project: values.project,
-    repos: values.repo,
+    ...repoScope(values.repo, values["all-repos"], USAGE),
     statusField: values["status-field"],
     iterationField: values["iteration-field"] ?? null,
     names: {
@@ -212,6 +287,7 @@ export function parseArgs(argv) {
       done: values["done-status"],
     },
     date: values.date ? isoDate(values.date, "--date") : null,
+    timezone: values.timezone === undefined ? null : checkTimeZone(values.timezone),
   };
 }
 
@@ -391,14 +467,16 @@ export function classify(items, me, names, sprintTitle) {
   };
 }
 
-/** Limit a `gh search` call to the listed repositories, or the whole owner. */
-export function scopeFlags(owner, repos) {
-  return repos.length ? repos.map((r) => `--repo=${r}`) : [`--owner=${owner}`];
+/** Limit a `gh search` call to the listed repositories, or to the whole owner with allRepos. */
+export function scopeFlags(owner, repos, allRepos = false) {
+  if (repos.length) return repos.map((r) => `--repo=${r}`);
+  if (allRepos) return [`--owner=${owner}`];
+  throw new UsageError(SCOPE_REQUIRED);
 }
 
-function prRows(queryArgs, owner, repos) {
-  const out = gh(["search", "prs", ...queryArgs, ...scopeFlags(owner, repos), "--state=open", "--limit=40",
-    "--json", "repository,number,title,url,createdAt,updatedAt,isDraft"]);
+function prRows(queryArgs, args) {
+  const out = gh(["search", "prs", ...queryArgs, ...scopeFlags(args.owner, args.repos, args.allRepos), "--state=open",
+    "--limit=40", "--json", "repository,number,title,url,createdAt,updatedAt,isDraft"]);
   return JSON.parse(out || "[]");
 }
 
@@ -442,10 +520,11 @@ export function viewerLogin() {
   return graphql("query { viewer { login } }").data.viewer.login;
 }
 
-export function collect(args) {
-  const today = args.date ?? localToday();
+export function collect(args, now = new Date()) {
+  const { today, timezone, timezoneDefaulted } = sprintToday(args.date, args.timezone, now);
+  if (timezoneDefaulted) io.warn(MACHINE_CLOCK);
   const me = viewerLogin();
-  const result = { generatedFor: me, today, owner: args.owner, statusNames: args.names };
+  const result = { generatedFor: me, today, timezone, timezoneDefaulted, owner: args.owner, statusNames: args.names };
 
   const [board, iterationField, current, upcoming] = resolveIterations(
     args.owner, args.project, today, args.iterationField);
@@ -461,9 +540,9 @@ export function collect(args) {
     ...classify(items, me, args.names, current?.title ?? null),
   });
 
-  const reviewsForMe = prRows([`--review-requested=${me}`], args.owner, args.repos);
-  const mentions = prRows([`--mentions=${me}`], args.owner, args.repos);
-  const authored = prRows([`--author=${me}`], args.owner, args.repos);
+  const reviewsForMe = prRows([`--review-requested=${me}`], args);
+  const mentions = prRows([`--mentions=${me}`], args);
+  const authored = prRows([`--author=${me}`], args);
   for (const row of [...reviewsForMe, ...authored]) row.detail = prDetail(row.repository.nameWithOwner, row.number);
   const seen = new Set([...reviewsForMe, ...authored].map((r) => r.url));
   result.prs = {

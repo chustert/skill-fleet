@@ -14,18 +14,36 @@ sprint's original commitments.
 
 ## Collect the evidence
 
-Read the tracker settings and map them to flags the same way `sprint-status`
-does: `--owner`, `--project`, `--iteration-field` when the board has several,
-and one `--repo` per repository in the routing table. Pass the sprint time zone
-from the tracker settings as `--timezone`. If a value the command needs is
-still `TODO`, say so and recommend `setup-project` rather than guessing. The
-board is required: if the settings name none, tell the user to run
-`npx skill-fleet@latest update`, which creates or repairs it.
+Read the tracker settings and the routing table in
+`docs/agents/issue-tracker.md`, following the
+[rules for reading the profile](../../references/project-profile.md), and map
+them to flags:
+
+| Tracker setting | Flag |
+| --- | --- |
+| Project board owner | `--owner <owner>` |
+| Project board title | `--project "<exact title>"` |
+| Iteration field | `--iteration-field "<name>"`, when the board has several |
+| Sprint time zone | `--timezone <IANA zone>`, on every run |
+| Each distinct repository in the routing table's `Repository` column, skipping rows whose `Component` is still `TODO` | `--repo <owner/repo>`, repeated |
+| Default repository, when the routing table has no `Repository` column or every row's `Component` is still `TODO` | `--repo <owner/repo>`, once |
+
+The script needs `--repo` or `--all-repos` and stops when it gets neither. Pass
+`--all-repos` instead of `--repo` only when the user asks for every repository
+of the owner. Never pass the template's placeholder `owner/repo`. The script
+rejects it. If another value the command needs is still `TODO`, say so and
+recommend `setup-project` rather than guessing. The board is required: if the
+settings name none, ask the user to run
+`npx skill-fleet@latest update --dry-run` and then
+`npx skill-fleet@latest update` in their own terminal. The update creates or
+repairs the project board on GitHub. Do not run it yourself without the user's
+approval. When the user asks you to run it, follow [Updating the
+installation](../../references/project-profile.md#updating-the-installation).
 
 Run from the project root:
 
 ```bash
-node .agents/skills/sprint-recap/scripts/sprint-recap.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> [--repo <owner/repo> ...]
+node .agents/skills/sprint-recap/scripts/sprint-recap.mjs --owner <owner> --project "<board title>" --timezone <IANA zone> --repo <owner/repo> [--repo <owner/repo> ...]
 ```
 
 The collector needs Node.js 20 or later and the GitHub CLI. It reuses the sibling
@@ -43,9 +61,12 @@ quarter, pass `--since YYYY-MM-DD` and optionally
 `--until YYYY-MM-DD` (inclusive, default today) instead of `--date`. Name that
 window in the recap rather than calling it a sprint.
 
-Dates use the time zone passed with `--timezone`, `UTC` when omitted. Use the
-tracker settings' sprint time zone unless the user requests another IANA time
-zone. The JSON records the exact start-inclusive, end-exclusive UTC window.
+Dates use the time zone passed with `--timezone`. Pass the tracker settings'
+sprint time zone unless the user requests another IANA time zone. When that
+setting is `TODO`, ask the user for a time zone rather than letting the script
+fall back to UTC. Without `--timezone`, the script uses UTC, writes a warning
+to stderr, and sets `window.timezoneDefaulted` to `true`. The JSON records the
+exact start-inclusive, end-exclusive UTC window.
 
 All remote calls are read-only and use `gh` authentication. If `read:project` is
 missing, tell the user to run `gh auth refresh -s read:project`. Do not work around
@@ -55,8 +76,10 @@ The collector paginates and rejects truncated searches rather than reporting par
 ## Write the recap
 
 Read the JSON before writing. Start with the sprint title or window, date range,
-account, time zone, scope, and collection cutoff. Say "so far" for an ongoing
-sprint. The JSON's `project.url` links the board when there is one.
+account, time zone, scope, and collection cutoff. When
+`window.timezoneDefaulted` is `true`, say that the dates use UTC because no
+sprint time zone was passed. Say "so far" for an ongoing sprint. The JSON's
+`project.url` links the board when there is one.
 
 Give a compact metrics table using these definitions:
 

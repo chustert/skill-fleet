@@ -24,7 +24,8 @@ GitHub mutation. Publication is a separate, explicitly authorized step.
    component involved, and any ADRs governing the area. In a workspace of
    independent repositories, include each affected repository's own
    `AGENTS.md`. Use the glossary's vocabulary throughout the spec and respect
-   the ADRs.
+   the ADRs. Handle a missing profile file, or a `TODO` or `None` value, as the
+   [project profile](../../references/project-profile.md) describes.
 3. Determine which component and repository own each deliverable using the
    routing table in `docs/agents/issue-tracker.md`. Treat components the profile
    marks as legacy or inactive as out of scope unless the discussion explicitly
@@ -137,8 +138,8 @@ The testing decisions that were made. Include:
 - prior art in the codebase for those tests
 - missing test harnesses and the evidence that replaces them
 - verification that requires credentials, a simulator, a physical device,
-  target hardware, a human play-test, hosted infrastructure, or approval, and
-  what that leaves unproven locally
+  target hardware, a human play-test, hosted infrastructure, a paid third-party
+  API, or approval, and what that leaves unproven locally
 
 ## Out of Scope
 

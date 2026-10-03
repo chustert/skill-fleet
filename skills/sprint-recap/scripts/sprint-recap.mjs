@@ -12,7 +12,10 @@ import { pathToFileURL } from "node:url";
 import { parseArgs as parseFlags } from "node:util";
 import * as sprintData from "../../sprint-status/scripts/sprint-data.mjs";
 
-const { UsageError, isoDate, addDays } = sprintData;
+const { UsageError, isoDate, addDays, REPAIR, checkTimeZone, zoneParts, zoneToday } = sprintData;
+
+export const UTC_FALLBACK = "No --timezone was passed, so dates use UTC, not the sprint time zone in "
+  + "docs/agents/issue-tracker.md.";
 
 export function timestamp(value) {
   return new Date(value);
@@ -28,25 +31,6 @@ export function within(value, start, end) {
   return start.getTime() <= time && time < end.getTime();
 }
 
-function checkTimeZone(timeZone) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-  } catch {
-    throw new UsageError(`Unknown time zone ${JSON.stringify(timeZone)}. Use an IANA name, such as Europe/Berlin.`);
-  }
-  return timeZone;
-}
-
-function zoneParts(date, timeZone) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  }).formatToParts(date);
-  const get = (type) => Number(parts.find((p) => p.type === type).value);
-  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"),
-    second: get("second") };
-}
-
 /** How far the zone's wall clock is ahead of UTC at this instant, in milliseconds. */
 function zoneOffset(date, timeZone) {
   const p = zoneParts(date, timeZone);
@@ -60,14 +44,11 @@ export function zoneMidnight(date, timeZone) {
   const guess = Date.UTC(y, m - 1, d);
   let instant = guess - zoneOffset(new Date(guess), timeZone);
   instant = guess - zoneOffset(new Date(instant), timeZone);
+  // In a zone whose daylight saving starts at midnight, midnight never happens on that day, and the
+  // instant above falls in the evening before. The day then starts when the clock jumps, which is
+  // midnight at the offset in force that evening.
+  if (zoneToday(new Date(instant), timeZone) < date) instant = guess - zoneOffset(new Date(instant), timeZone);
   return new Date(instant);
-}
-
-/** Today's date in the time zone, as YYYY-MM-DD. */
-export function zoneToday(now, timeZone) {
-  const p = zoneParts(now, timeZone);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
 
 /** The start-inclusive, end-exclusive UTC window of a sprint, stopping at now. */
@@ -77,8 +58,11 @@ export function window(sprint, timeZone, now) {
   return [start, end.getTime() < now.getTime() ? end : now];
 }
 
-/** Swappable in tests: every GitHub call in this file goes through deps. */
+/** Swappable in tests: every GitHub call and warning in this file goes through deps. */
 export const deps = {
+  warn(message) {
+    sprintData.io.warn(message);
+  },
   api(endpoint, params = {}) {
     const args = ["api", "--method", "GET", endpoint];
     for (const [key, value] of Object.entries(params)) args.push("-f", `${key}=${value}`);
@@ -152,11 +136,12 @@ export function metrics(activity) {
   };
 }
 
-/** Search qualifier for the listed repositories, or everything the owner has. */
-export function scopeQualifier(owner, ownerType, repos) {
+/** Search qualifier for the listed repositories, or everything the owner has with allRepos. */
+export function scopeQualifier(owner, ownerType, repos, allRepos = false) {
   // Several repo: qualifiers in one query match any of them.
   if (repos.length) return repos.map((r) => `repo:${r}`).join(" ");
-  return `${ownerType === "organization" ? "org" : "user"}:${owner}`;
+  if (allRepos) return `${ownerType === "organization" ? "org" : "user"}:${owner}`;
+  throw new UsageError(sprintData.SCOPE_REQUIRED);
 }
 
 export function collect(me, start, end, scope) {
@@ -213,8 +198,14 @@ export function collect(me, start, end, scope) {
 }
 
 const USAGE = `Usage: node sprint-recap.mjs --owner <owner> [--project <number or exact title>]
-  [--iteration-field <name>] [--repo <owner/repo> ...] [--timezone <IANA zone>]
+  (--repo <owner/repo> ... | --all-repos) [--timezone <IANA zone>]
+  [--iteration-field <name>]
   [--date YYYY-MM-DD | --since YYYY-MM-DD [--until YYYY-MM-DD]]
+
+Pass --repo for each repository in the routing table of
+docs/agents/issue-tracker.md. --all-repos covers every repository the owner has
+instead. Pass that file's sprint time zone as --timezone. Without it, dates use
+UTC and the script warns.
 
 --date selects the sprint containing that date. --since and --until select an
 explicit window instead, such as a month or a quarter.`;
@@ -229,10 +220,11 @@ export function parseArgs(argv) {
         project: { type: "string" },
         "iteration-field": { type: "string" },
         repo: { type: "string", multiple: true, default: [] },
+        "all-repos": { type: "boolean", default: false },
         date: { type: "string" },
         since: { type: "string" },
         until: { type: "string" },
-        timezone: { type: "string", default: "UTC" },
+        timezone: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -252,11 +244,12 @@ export function parseArgs(argv) {
     owner: values.owner,
     project: values.project ?? null,
     iterationField: values["iteration-field"] ?? null,
-    repos: values.repo,
+    ...sprintData.repoScope(values.repo, values["all-repos"], USAGE),
     date: values.date ? isoDate(values.date, "--date") : null,
     since: values.since ? isoDate(values.since, "--since") : null,
     until: values.until ? isoDate(values.until, "--until") : null,
-    timezone: checkTimeZone(values.timezone),
+    timezone: checkTimeZone(values.timezone ?? "UTC"),
+    timezoneDefaulted: values.timezone === undefined,
   };
 }
 
@@ -274,8 +267,8 @@ export function selectPeriod(args, now) {
     let field;
     [board, field, period] = deps.resolveIterations(args.owner, args.project, selected, args.iterationField);
     if (!field) {
-      throw new UsageError("The board has no iteration field. Run npx skill-fleet@latest update, which adds it, "
-        + "or pass --since and --until.");
+      throw new UsageError(`The board "${board.title}" has no iteration field. ${REPAIR} `
+        + "To recap a date window instead, pass --since and --until.");
     }
     if (!period) throw new UsageError(`No sprint contains ${selected}. Choose a date inside an iteration.`);
   }
@@ -287,10 +280,11 @@ export function selectPeriod(args, now) {
 export function main(argv) {
   const args = parseArgs(argv);
   if (args.help) return args.help;
+  if (args.timezoneDefaulted) deps.warn(UTC_FALLBACK);
   const now = new Date();
   const [board, period, start, end] = selectPeriod(args, now);
   const me = deps.api("user").login;
-  const scope = scopeQualifier(args.owner, sprintData.ownerRoot(args.owner), args.repos);
+  const scope = scopeQualifier(args.owner, sprintData.ownerRoot(args.owner), args.repos, args.allRepos);
   const [activity, queries] = collect(me, start, end, scope);
   const repositories = [...new Set(Object.values(activity).flatMap((rows) => rows.map((r) => r.repo)))].sort();
   const result = {
@@ -298,7 +292,8 @@ export function main(argv) {
     generatedAt: iso(now),
     project: board ? { title: board.title, url: board.url } : null,
     sprint: period,
-    window: { startInclusive: iso(start), endExclusive: iso(end), timezone: args.timezone },
+    window: { startInclusive: iso(start), endExclusive: iso(end), timezone: args.timezone,
+      timezoneDefaulted: args.timezoneDefaulted },
     scope: args.repos.length
       ? `${args.repos.join(", ")}, regardless of board membership`
       : `Accessible ${args.owner} repositories, regardless of board membership`,
@@ -314,6 +309,7 @@ export function main(argv) {
       "Reviews count submitted reviews on others' PRs, including reviews later dismissed, not comments or pending drafts.",
       "Open-to-merge time includes draft time and time before the period. It is not working time.",
       "Board commitments, hours worked, deployments, and unpushed work are not measured.",
+      ...(args.timezoneDefaulted ? [UTC_FALLBACK] : []),
     ],
   };
   return JSON.stringify(result, null, 2);
